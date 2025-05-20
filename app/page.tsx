@@ -39,10 +39,13 @@ export default function Home() {
 
   const handleJoinRoom = async () => {
     if (userName && room) {
-      socket.emitWithAck('join-room', {
-        room,
-        username: userName,
-      });
+      const responce: { sender: string; message: string }[] =
+        await socket.emitWithAck('join-room', {
+          room,
+          username: userName,
+        });
+      console.log({ responce });
+      setMessages(responce);
     }
     setJoined(true);
   };

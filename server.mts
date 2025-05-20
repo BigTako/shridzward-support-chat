@@ -9,7 +9,19 @@ const port = parseInt(process.env.PORT || '3000', 10);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-const chats: { [key: string]: { sender: string; message: string }[] } = {};
+type TMessage = {
+  type: 'context' | 'client' | 'agent';
+  from: 'context' | 'client' | 'agent';
+  text: string;
+};
+
+type TRoom = {
+  roomId: number;
+  messages: TMessage[];
+  createdAt: Date;
+};
+
+const rooms: { [key: number]: TRoom } = {};
 
 app.prepare().then(() => {
   const httpServer = createServer(handle);
@@ -18,15 +30,40 @@ app.prepare().then(() => {
   io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
+    // ai events
+    socket.on(
+      'create-new-room',
+      ({ question }: { question: string }, callback) => {
+        const roomId = new Date().getTime();
+        rooms[roomId] = {
+          roomId,
+          messages: [
+            {
+              type: 'context',
+              from: 'context',
+              text: `User question: "${question}". Please wait unitl client joins.`,
+            },
+          ],
+          createdAt: new Date(),
+        };
+        callback({
+          status: 'success',
+          message: 'Room created successfuly',
+          room: {
+            roomId,
+            from: 'context',
+            lastMessage: `User question: "${question}". Please wait unitl client joins.`,
+          },
+        });
+      }
+    );
+    //client events
+
+    // agent events
     socket.on('join-room', ({ room, username }) => {
       socket.join(room);
       console.log(`User ${username} joined room ${room}`);
       socket.to(room).emit('user_joined', `${username} joined room `);
-      if (!chats[room]) {
-        chats[room] = [];
-      }
-      const chatHistory = chats[room];
-      return chatHistory;
     });
 
     socket.on('message', ({ room, message, sender }) => {
