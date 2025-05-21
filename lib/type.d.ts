@@ -1,4 +1,4 @@
-export type FromType = 'agent' | 'client' | 'context';
+export type FromType = 'agent' | 'client' | 'context' | 'system';
 
 export type TRoom = {
   roomId: number;

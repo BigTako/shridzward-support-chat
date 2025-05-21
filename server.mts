@@ -9,9 +9,10 @@ const port = parseInt(process.env.PORT || '3000', 10);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
+export type FromType = 'agent' | 'client' | 'context' | 'system';
+
 type TMessage = {
-  type: 'context' | 'client' | 'agent';
-  from: 'context' | 'client' | 'agent';
+  from: FromType;
   text: string;
 };
 
@@ -21,12 +22,21 @@ type TRoom = {
   createdAt: Date;
 };
 
+let agentSocketId: string;
+
 const agentCredentials = {
   username: 'John',
   password: '12345',
 };
 
-const rooms: { [key: number]: TRoom } = {};
+const rooms: { [key: TRoom['roomId']]: TRoom } = {};
+
+function sendMessage(roomId: TRoom['roomId'], message: TMessage) {
+  const room = rooms[roomId];
+  if (room) {
+    room.messages = [...room.messages, message];
+  }
+}
 
 app.prepare().then(() => {
   const httpServer = createServer(handle);
@@ -44,21 +54,24 @@ app.prepare().then(() => {
           roomId,
           messages: [
             {
-              type: 'context',
               from: 'context',
               text: `User question: "${question}". Please wait unitl client joins.`,
             },
           ],
           createdAt: new Date(),
         };
+        const newChat = {
+          roomId,
+          from: 'context',
+          lastMessage: `User question: "${question}". Please wait unitl client joins.`,
+        };
+        console.log({ agentSocketId });
+        if (agentSocketId)
+          socket.to(agentSocketId).emit('new-client-chat', newChat);
         callback({
           status: 'success',
           message: 'Room created successfuly',
-          room: {
-            roomId,
-            from: 'context',
-            lastMessage: `User question: "${question}". Please wait unitl client joins.`,
-          },
+          room: newChat,
         });
       }
     );
@@ -75,6 +88,8 @@ app.prepare().then(() => {
           username === agentCredentials.username &&
           password === agentCredentials.password;
 
+        agentSocketId = socket.id;
+
         console.log({ credsCorrect });
         if (credsCorrect) {
           callback({
@@ -90,16 +105,54 @@ app.prepare().then(() => {
       }
     );
 
-    socket.on('join-room', ({ room, username }) => {
-      socket.join(room);
-      console.log(`User ${username} joined room ${room}`);
-      socket.to(room).emit('user_joined', `${username} joined room `);
+    socket.on('get-chats', ({}, callback) => {
+      const chats = Object.values(rooms).map((r) => {
+        const lastMessage = r.messages[r.messages.length - 1];
+
+        return {
+          roomId: r.roomId,
+          from: lastMessage.from,
+          lastMessage: lastMessage.text,
+        };
+      });
+      callback(chats);
     });
 
-    socket.on('message', ({ room, message, sender }) => {
-      console.log(`Message from ${sender} in room ${room}: ${message}`);
-      socket.to(room).emit('message', { sender, message });
+    socket.on('join-room', ({ roomId, user: { username, type } }, callback) => {
+      socket.join(roomId);
+      socket.to(roomId).emit('user_joined', `${username} joined room `);
+      const isAgent = type === 'agent';
+      if (!rooms[roomId]) {
+        rooms[roomId] = {
+          roomId,
+          messages: [],
+          createdAt: new Date(),
+        };
+        socket.to(roomId).emit('user_joined', `${username} joined room `);
+      }
+      const room = rooms[roomId];
+      callback(
+        isAgent
+          ? room.messages
+          : room.messages.filter((m) => m.from !== 'context')
+      );
     });
+
+    socket.on(
+      'message',
+      ({
+        roomId,
+        message,
+        sender,
+      }: {
+        roomId: TRoom['roomId'];
+        message: string;
+        sender: { username: string; type: 'client' | 'agent' };
+      }) => {
+        console.log(`Message from ${sender} in room ${roomId}: ${message}`);
+        sendMessage(roomId, { from: sender.type, text: message });
+      }
+    );
 
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.id}`);

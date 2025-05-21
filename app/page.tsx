@@ -1,6 +1,6 @@
 'use client';
 import ChatMessage from '@/components/ChatMessage';
-import ChatForm from '@/components/ChatRoom';
+import ChatForm from '@/components/ChatForm';
 import { socket } from '@/lib/socketClient';
 import { useEffect, useState } from 'react';
 
@@ -12,21 +12,21 @@ export default function Home() {
   >([]);
   const [userName, setUserName] = useState<string>('');
 
-  useEffect(() => {
-    socket.on('message', (data) => {
-      console.log(' received message from socket');
-      setMessages((prev) => [...prev, data]);
-    });
+  // useEffect(() => {
+  //   socket.on('message', (data) => {
+  //     console.log(' received message from socket');
+  //     setMessages((prev) => [...prev, data]);
+  //   });
 
-    socket.on('user_joined', (message) => {
-      setMessages((prev) => [...prev, { sender: 'system', message }]);
-    });
+  //   socket.on('user_joined', (message) => {
+  //     setMessages((prev) => [...prev, { sender: 'system', message }]);
+  //   });
 
-    return () => {
-      socket.off('user_joined');
-      socket.off('message');
-    };
-  }, []);
+  //   return () => {
+  //     socket.off('user_joined');
+  //     socket.off('message');
+  //   };
+  // }, []);
 
   const handleSendMessage = (message: string) => {
     setMessages((prev) => [...prev, { sender: userName, message }]);
