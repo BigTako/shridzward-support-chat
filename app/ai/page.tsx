@@ -1,31 +1,11 @@
 'use client';
 
 import ChatForm from '@/components/ChatRoom';
+import { fromMapping } from '@/lib/const';
 import { socket } from '@/lib/socketClient';
+import { FromType, TRoom } from '@/lib/type';
 import Image from 'next/image';
 import { useState } from 'react';
-
-type FromType = 'agent' | 'client' | 'context';
-
-const fromMapping: Record<FromType, string> = {
-  agent: 'Agent John',
-  client: 'Client',
-  context: 'Context',
-};
-
-// const chats: { roomId: string; from: FromType; lastMessage: string }[] = [
-//   {
-//     roomId: '123ig123g1g',
-//     from: 'context',
-//     lastMessage: 'User question: question. Please wait unitl client joins.',
-//   },
-// ];
-
-type TRoom = {
-  roomId: number;
-  from: FromType;
-  lastMessage: string;
-};
 
 export default function AiWorkflow() {
   const [rooms, setRooms] = useState<TRoom[]>([]);

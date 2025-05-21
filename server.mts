@@ -21,6 +21,11 @@ type TRoom = {
   createdAt: Date;
 };
 
+const agentCredentials = {
+  username: 'John',
+  password: '12345',
+};
+
 const rooms: { [key: number]: TRoom } = {};
 
 app.prepare().then(() => {
@@ -60,6 +65,31 @@ app.prepare().then(() => {
     //client events
 
     // agent events
+    socket.on(
+      'agent-login',
+      (
+        { username, password }: { username: string; password: string },
+        callback
+      ) => {
+        const credsCorrect =
+          username === agentCredentials.username &&
+          password === agentCredentials.password;
+
+        console.log({ credsCorrect });
+        if (credsCorrect) {
+          callback({
+            status: 'success',
+            message: 'Login successful!',
+          });
+        } else {
+          callback({
+            status: 'error',
+            message: 'Invalid username or password',
+          });
+        }
+      }
+    );
+
     socket.on('join-room', ({ room, username }) => {
       socket.join(room);
       console.log(`User ${username} joined room ${room}`);
