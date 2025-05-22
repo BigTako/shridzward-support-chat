@@ -93,13 +93,11 @@ export default function AgentPage() {
 
   const [messages, setMessages] = useState<TMessage[]>([]);
 
-  // useEffect(() => {
-  //   async function getChats() {
-  //     const chats = (await socket.emitWithAck('get-chats')) as TRoom[];
-  //     setRooms(chats);
-  //   }
-  //   getChats();
-  // }, []);
+  useEffect(() => {
+    socket.emitWithAck('get-chats').then((data: TChatShorting[]) => {
+      setChats(data);
+    });
+  }, []);
 
   useEffect(() => {
     socket.on('new-client-chat', (data: TChatShorting) => {
