@@ -5,3 +5,8 @@ export type TRoom = {
   from: FromType;
   lastMessage: string;
 };
+
+export type TMessage = {
+  from: FromType;
+  text: string;
+};

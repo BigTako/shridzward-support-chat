@@ -121,6 +121,7 @@ app.prepare().then(() => {
     socket.on('join-room', ({ roomId, user: { username, type } }, callback) => {
       socket.join(roomId);
       socket.to(roomId).emit('user_joined', `${username} joined room `);
+      console.log(`${username} joined room ${roomId}`);
       const isAgent = type === 'agent';
       if (!rooms[roomId]) {
         rooms[roomId] = {
@@ -150,6 +151,9 @@ app.prepare().then(() => {
         sender: { username: string; type: 'client' | 'agent' };
       }) => {
         console.log(`Message from ${sender} in room ${roomId}: ${message}`);
+        socket
+          .to(String(roomId))
+          .emit('message', { from: sender.type, text: message });
         sendMessage(roomId, { from: sender.type, text: message });
       }
     );
