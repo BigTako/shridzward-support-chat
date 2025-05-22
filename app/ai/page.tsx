@@ -5,6 +5,7 @@ import ChatForm from '@/components/ChatForm';
 import { SOCKET_EVENTS } from '@/lib/const';
 import { socket } from '@/lib/socketClient';
 import { TChatShorting } from '@/lib/type';
+import { useRouter } from 'next/router';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -16,7 +17,7 @@ type TCreateChatPayload = {
 
 export default function AiWorkflow() {
   const [chats, setChats] = useState<TChatShorting[]>([]);
-
+  const router = useRouter();
   const addChat = (data: TChatShorting) => {
     setChats((r) => [data, ...r]);
   };
@@ -43,7 +44,11 @@ export default function AiWorkflow() {
         <ChatForm onSendMessage={handleCreateNewRoom} />
         <div className='flex flex-col gap-5'>
           {chats.map((chat) => (
-            <ChatCard chat={chat} key={`client-chat-${chat.id}`} />
+            <ChatCard
+              chat={chat}
+              key={`client-chat-${chat.id}`}
+              onNameClick={() => router.push(`/?chat=${chat.id}`)}
+            />
           ))}
         </div>
       </div>

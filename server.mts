@@ -53,6 +53,8 @@ type TChatShorting = Pick<TChat, 'id' | 'createdAt'> & {
   lastMessage: TMessage;
 };
 
+type TUserInfo = Pick<TUser, 'username' | 'type'>;
+
 class UserStore {
   users: TUser[] = [];
 
@@ -60,8 +62,8 @@ class UserStore {
     return this.users;
   }
 
-  getUser({ username }: TUser): TUser | undefined {
-    return this.users.find((u) => u.username === username);
+  getUser({ username, type }: TUserInfo): TUser | undefined {
+    return this.users.find((u) => u.username === username && u.type === type);
   }
 
   addUser(user: TUser): this {
@@ -193,29 +195,86 @@ app.prepare().then(() => {
             message: 'Error creating chat.Please review server logs.',
           });
         }
-        // rooms[roomId] = {
-        //   roomId,
-        //   messages: [
-        //     {
-        //       from: 'context',
-        //       text: `User question: "${question}". Please wait unitl client joins.`,
-        //     },
-        //   ],
-        //   createdAt: new Date(),
-        // };
-        // const newChat = {
-        //   roomId,
-        //   from: 'context',
-        //   lastMessage: `User question: "${question}". Please wait unitl client joins.`,
-        // };
-        // console.log({ agentSocketId });
-        // if (agentSocketId)
-        //   socket.to(agentSocketId).emit('new-client-chat', newChat);
-        // callback({
-        //   status: 'success',
-        //   message: 'Room created successfuly',
-        //   room: newChat,
-        // });
+      }
+    );
+
+    socket.on(
+      'login',
+      (
+        { username, type, password }: TUserInfo & { password?: string },
+        callback
+      ) => {
+        try {
+          console.log('login');
+          const isAgent = type === 'agent';
+          if (isAgent) {
+            const agent = userStore.getUser({ username, type });
+            if (agent) {
+              return callback({
+                status: 'error',
+                message: 'Agent is already logged in',
+              });
+            }
+            const credsCorrect =
+              username === agentCredentials.username &&
+              password === agentCredentials.password;
+            if (!credsCorrect) {
+              return callback({
+                status: 'error',
+                message: 'Invalid credentials',
+              });
+            }
+          }
+          userStore.addUser({
+            username,
+            type,
+            socketId: socket.id,
+          });
+          return callback({
+            status: 'success',
+            message: 'Login successful!',
+          });
+          // console.log('creating new chat');
+          // const chatId = String(new Date().getTime());
+          // const contextMessage = {
+          //   from: {
+          //     username: 'Claude',
+          //     socketId: '0',
+          //     type: 'client',
+          //   },
+          //   type: 'context',
+          //   text: `User asked a question: ${question}. Please wait unitl client joins.`,
+          // } as TMessage;
+
+          // const newChatShorting = {
+          //   id: chatId,
+          //   createdAt: new Date(),
+          //   lastMessage: contextMessage,
+          // } as TChatShorting;
+
+          // chatStore.createChat({
+          //   id: chatId,
+          //   createdAt: newChatShorting.createdAt,
+          //   messages: [contextMessage],
+          // });
+
+          // const agent = userStore.getUsers().find((u) => u.type === 'agent');
+          // if (agent) {
+          //   socket.to(agent.socketId).emit('new-client-chat', newChatShorting);
+          // }
+
+          // callback({
+          //   status: 'success',
+          //   message: 'Chat created successfuly',
+          //   chat: newChatShorting,
+          // });
+        } catch (e) {
+          console.log({ e });
+          callback({
+            status: 'error',
+            message: 'Error creating chat.Please review server logs.',
+          });
+        }
       }
     );
     //client events

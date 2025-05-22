@@ -1,15 +1,13 @@
 'use client';
 import { TChatShorting } from '@/lib/type';
 import Image from 'next/image';
-import Link from 'next/link';
 
-export function ChatCard({
-  chat,
-  link,
-}: {
+type Props = {
   chat: TChatShorting;
-  link?: string;
-}) {
+  onNameClick: () => void;
+};
+
+export function ChatCard({ chat, onNameClick }: Props) {
   const from = chat.lastMessage?.from?.username || 'Anonymous';
   const lastMessage = chat.lastMessage?.text || '...';
   console.log({ chat });
@@ -24,9 +22,9 @@ export function ChatCard({
           height={840}
         />
         <div className='flex-1 flex flex-col gap-1 max-w-full truncate text-start'>
-          <Link href={link || `/?chat=${chat.id}`}>
-            <h3 className='font-bold'>Room: {chat.id}</h3>
-          </Link>
+          <h3 className='font-bold cursor-pointer' onClick={onNameClick}>
+            Room: {chat.id}
+          </h3>
           <h3 className='truncate text-ellipsis max-w-full'>
             <strong>{from}:</strong> {lastMessage}
             {/* {fromMapping[chat.from as FromType]}: {chat.lastMessage} */}

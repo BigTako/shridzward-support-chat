@@ -4,7 +4,7 @@ export type TUserType = 'client' | 'agent';
 
 export type TUser = {
   username: string;
-  socketId: string;
+  // socketId: string;
   type: TUserType;
 };
 
