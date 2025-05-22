@@ -120,14 +120,16 @@ export default function AgentPage() {
 
   useEffect(() => {
     if (isAuthenticated && chatId) {
-      socket.emitWithAck('join-chat').then((data: TMessage[]) => {
-        setMessages((prev) => [
-          ...prev.filter((m) => m.type === 'system'),
-          ...data,
-        ]);
-      });
+      socket
+        .emitWithAck('join-chat', { chatId, user })
+        .then((data: TMessage[]) => {
+          setMessages((prev) => [
+            ...prev.filter((m) => m.type === 'system'),
+            ...data,
+          ]);
+        });
     }
-  }, [isAuthenticated, chatId]);
+  }, [isAuthenticated, chatId, user]);
 
   // useEffect(() => {
   //   async function getChatHistory() {
@@ -183,8 +185,7 @@ export default function AgentPage() {
                   {messages.map((msg, index) => (
                     <ChatMessage
                       key={index}
-                      sender={msg.from.username}
-                      message={msg.text}
+                      message={msg}
                       isOwnMessage={
                         user.type === msg.from.type &&
                         user.username === msg.from.username
@@ -196,7 +197,7 @@ export default function AgentPage() {
               </div>
             </div>
           ) : (
-            <div className='h-[500px] w-[400px] overflow-y-auto p-4 mb-4 bg-gray-200 border2 rounded-lg flex justify-center items-center'>
+            <div className='h-[500px] w-[500px] overflow-y-auto p-4 mb-4 bg-gray-200 border2 rounded-lg flex justify-center items-center'>
               <h3 className='h-fit'>Chat is not selected yet</h3>
             </div>
           )}
