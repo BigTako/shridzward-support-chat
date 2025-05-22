@@ -74,30 +74,20 @@ function AgentLoginForm({ onSuccess }: { onSuccess: (user: TUser) => void }) {
 export default function AgentPage() {
   const [chatId, setChatId] = useState<TChat['id'] | null>(null);
 
-  const [chats, setChats] = useState<TChatShorting[]>([
-    {
-      id: '1234132',
-      createdAt: new Date(),
-      lastMessage: {
-        from: {
-          username: 'Claude',
-          type: 'client',
-        },
-        type: 'context',
-        text: `User asked a question: ${'queystion'}. Please wait unitl client joins.`,
-      },
-    },
-  ]);
+  const [chats, setChats] = useState<TChatShorting[]>([]);
 
   const [user, setUser] = useState<TUser | null>(null);
-
   const [messages, setMessages] = useState<TMessage[]>([]);
+  const isAuthenticated = user !== null;
 
   useEffect(() => {
-    socket.emitWithAck('get-chats').then((data: TChatShorting[]) => {
-      setChats(data);
-    });
-  }, []);
+    if (isAuthenticated) {
+      socket.emitWithAck('get-chats', {}).then((data: TChatShorting[]) => {
+        console.log({ data });
+        setChats(data);
+      });
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     socket.on('new-client-chat', (data: TChatShorting) => {
@@ -128,11 +118,16 @@ export default function AgentPage() {
     };
   }, []);
 
-  // useEffect(() => {
-  //   if (isAuthenticated && chatId) {
-  //     socket.emit('joi')
-  //   }
-  // }, [isAuthenticated, chatId])
+  useEffect(() => {
+    if (isAuthenticated && chatId) {
+      socket.emitWithAck('join-chat').then((data: TMessage[]) => {
+        setMessages((prev) => [
+          ...prev.filter((m) => m.type === 'system'),
+          ...data,
+        ]);
+      });
+    }
+  }, [isAuthenticated, chatId]);
 
   // useEffect(() => {
   //   async function getChatHistory() {
@@ -158,7 +153,6 @@ export default function AgentPage() {
   // };
 
   // if (!user) return null;
-  const isAuthenticated = user !== null;
 
   const handleSendMessage = () => {};
 
@@ -184,8 +178,8 @@ export default function AgentPage() {
           {chatId ? (
             <div className='flex justify-center w-full'>
               <div className='w-full mx-auto'>
-                <h1 className='mb-4 text-2xl font-bold'>Room: 1</h1>
-                <div className='h-[500px] overflow-y-auto p-4 mb-4 bg-gray-200 border2 rounded-lg'>
+                <h1 className='mb-4 text-2xl font-bold'>Chat: {chatId}</h1>
+                <div className='h-[500px] w-[500px] overflow-y-auto p-4 mb-4 bg-gray-200 border2 rounded-lg'>
                   {messages.map((msg, index) => (
                     <ChatMessage
                       key={index}

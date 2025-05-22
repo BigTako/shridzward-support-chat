@@ -91,6 +91,17 @@ class ChatsStore {
     return this.chats;
   }
 
+  getShortings(): TChatShorting[] {
+    return this.chats.map((chat) => {
+      const lastMessage = chat.messages[chat.messages.length - 1];
+      return {
+        ...chat,
+        messages: undefined,
+        lastMessage,
+      };
+    });
+  }
+
   getChat(chatId: string): TChat | undefined {
     return this.chats.find((c) => c.id === chatId);
   }
@@ -248,6 +259,33 @@ app.prepare().then(() => {
         }
       }
     );
+
+    socket.on('get-chats', (_, callback) => {
+      console.log('get-chats');
+      callback(chatStore.getShortings());
+    });
+
+    socket.on(
+      'join-chat',
+      ({ chatId, user }: { chatId: TChat['id']; user: TUser }, callback) => {
+        const chat = chatStore.getChat(chatId);
+
+        if (chat) {
+          socket.join(chatId);
+          socket
+            .to(chatId)
+            .emit('user_joined', `${user.username} joined room `);
+          console.log(`${user.username} joined room ${chatId}`);
+          const isAgent = user.type === 'agent';
+          callback(
+            isAgent
+              ? chat.messages
+              : chat.messages.filter((m) => m.type !== 'context')
+          );
+        }
+      }
+    );
+
     //client events
 
     // agent events
