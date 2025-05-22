@@ -1,12 +1,25 @@
-export type FromType = 'agent' | 'client' | 'context' | 'system';
+export type TMessageType = 'user' | 'system' | 'context';
 
-export type TRoom = {
-  roomId: number;
-  from: FromType;
-  lastMessage: string;
+export type TUserType = 'client' | 'agent';
+
+export type TUser = {
+  username: string;
+  socketId: string;
+  type: TUserType;
 };
 
 export type TMessage = {
-  from: FromType;
+  from: TUser;
+  type: TMessageType;
   text: string;
+};
+
+export type TChat = {
+  id: string;
+  createdAt: Date;
+  messages: TMessage[];
+};
+
+export type TChatShorting = Pick<TChat, 'id' | 'createdAt'> & {
+  lastMessage: TMessage;
 };
