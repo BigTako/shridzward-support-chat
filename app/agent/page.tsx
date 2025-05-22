@@ -12,6 +12,7 @@ function AgentLoginForm({ onSuccess }: { onSuccess: (user: TUser) => void }) {
   const handleLogin = async (username: string, password: string) => {
     const result = (await socket.emitWithAck('login', {
       username,
+      type: 'agent',
       password,
     })) as {
       status: 'success' | 'error';
@@ -88,20 +89,9 @@ export default function AgentPage() {
     },
   ]);
 
-  const [user, setUser] = useState<TUser | null>({
-    username: 'John',
-    type: 'agent',
-  });
+  const [user, setUser] = useState<TUser | null>(null);
 
   const [messages, setMessages] = useState<TMessage[]>([]);
-
-  // useEffect(() => {
-  //   if (window) {
-  //     if (isLoggedIn === false || (user && user.type !== 'agent')) {
-  //       router.push('/agent/login');
-  //     }
-  //   }
-  // }, [router, user, isLoggedIn]);
 
   // useEffect(() => {
   //   async function getChats() {
@@ -111,27 +101,40 @@ export default function AgentPage() {
   //   getChats();
   // }, []);
 
+  useEffect(() => {
+    socket.on('new-client-chat', (data: TChatShorting) => {
+      console.log(' received chat from socket');
+      setChats((prev) => [data, ...prev]);
+    });
+
+    socket.on('message', (data) => {
+      console.log(' received message from socket');
+      setMessages((prev) => [...prev, data]);
+    });
+
+    socket.on('user_joined', (message) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          from: { username: '', type: 'client' },
+          type: 'system',
+          text: message,
+        },
+      ]);
+    });
+
+    return () => {
+      socket.off('new-client-chat');
+      socket.off('message');
+      socket.off('user_joined');
+    };
+  }, []);
+
   // useEffect(() => {
-  //   socket.on('new-client-chat', (data: TRoom) => {
-  //     console.log(' received chat from socket');
-  //     setRooms((prev) => [data, ...prev]);
-  //   });
-
-  //   socket.on('message', (data) => {
-  //     console.log(' received message from socket');
-  //     setMessages((prev) => [...prev, data]);
-  //   });
-
-  //   socket.on('user_joined', (message) => {
-  //     setMessages((prev) => [...prev, { from: 'system', text: message }]);
-  //   });
-
-  //   return () => {
-  //     socket.off('new-client-chat');
-  //     socket.off('message');
-  //     socket.off('user_joined');
-  //   };
-  // }, []);
+  //   if (isAuthenticated && chatId) {
+  //     socket.emit('joi')
+  //   }
+  // }, [isAuthenticated, chatId])
 
   // useEffect(() => {
   //   async function getChatHistory() {

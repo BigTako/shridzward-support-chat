@@ -179,6 +179,7 @@ app.prepare().then(() => {
           });
 
           const agent = userStore.getUsers().find((u) => u.type === 'agent');
+          console.log({ agent });
           if (agent) {
             socket.to(agent.socketId).emit('new-client-chat', newChatShorting);
           }
@@ -230,44 +231,14 @@ app.prepare().then(() => {
             type,
             socketId: socket.id,
           });
+
+          // const user = userStore.getUsers();
+          // console.log({ user });
+
           return callback({
             status: 'success',
             message: 'Login successful!',
           });
-          // console.log('creating new chat');
-          // const chatId = String(new Date().getTime());
-          // const contextMessage = {
-          //   from: {
-          //     username: 'Claude',
-          //     socketId: '0',
-          //     type: 'client',
-          //   },
-          //   type: 'context',
-          //   text: `User asked a question: ${question}. Please wait unitl client joins.`,
-          // } as TMessage;
-
-          // const newChatShorting = {
-          //   id: chatId,
-          //   createdAt: new Date(),
-          //   lastMessage: contextMessage,
-          // } as TChatShorting;
-
-          // chatStore.createChat({
-          //   id: chatId,
-          //   createdAt: newChatShorting.createdAt,
-          //   messages: [contextMessage],
-          // });
-
-          // const agent = userStore.getUsers().find((u) => u.type === 'agent');
-          // if (agent) {
-          //   socket.to(agent.socketId).emit('new-client-chat', newChatShorting);
-          // }
-
-          // callback({
-          //   status: 'success',
-          //   message: 'Chat created successfuly',
-          //   chat: newChatShorting,
-          // });
         } catch (e) {
           console.log({ e });
           callback({

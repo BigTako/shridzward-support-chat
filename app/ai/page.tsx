@@ -5,7 +5,7 @@ import ChatForm from '@/components/ChatForm';
 import { SOCKET_EVENTS } from '@/lib/const';
 import { socket } from '@/lib/socketClient';
 import { TChatShorting } from '@/lib/type';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 
