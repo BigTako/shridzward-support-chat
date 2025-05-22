@@ -131,32 +131,17 @@ export default function AgentPage() {
     }
   }, [isAuthenticated, chatId, user]);
 
-  // useEffect(() => {
-  //   async function getChatHistory() {
-  //     const messages = await socket.emitWithAck('join-room', { chatId, user });
-  //     console.log({ messages });
-  //     setMessages((prev) => [
-  //       ...prev.filter((m) => m.from === 'system'),
-  //       ...messages,
-  //     ]);
-  //   }
-
-  //   if (user && chatId) {
-  //     console.log('get chat history');
-  //     getChatHistory();
-  //   }
-  // }, [chatId, user]);
-
-  // const handleSendMessage = (message: string) => {
-  //   if (user && chatId) {
-  //     socket.emit('message', { chatId, message, sender: user });
-  //     setMessages((prev) => [...prev, { from: user?.type, text: message }]);
-  //   }
-  // };
-
-  // if (!user) return null;
-
-  const handleSendMessage = () => {};
+  const handleSendMessage = (messageText: string) => {
+    if (user && chatId) {
+      const message = {
+        type: 'user',
+        text: messageText,
+        from: user,
+      } as TMessage;
+      socket.emit('message', { chatId, message });
+      setMessages((prev) => [...prev, message]);
+    }
+  };
 
   return (
     <div className='flex mt-24 justify-center w-full'>

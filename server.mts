@@ -286,6 +286,16 @@ app.prepare().then(() => {
       }
     );
 
+    socket.on(
+      'message',
+      ({ chatId, message }: { chatId: TChat['id']; message: TMessage }) => {
+        const { from, text } = message;
+        console.log(`Message from ${from.username} in room ${chatId}: ${text}`);
+        socket.to(chatId).emit('message', message);
+        chatStore.sendMessage(chatId, message);
+      }
+    );
+
     //client events
 
     // agent events
