@@ -17,7 +17,7 @@ const ChatForm = ({
     console.log('SUbmitted');
   };
   return (
-    <form onSubmit={handleSubmit} className='w-full flex gap-2'>
+    <form onSubmit={handleSubmit} className='max-w-full flex gap-2'>
       <input
         type='text'
         placeholder='Type text...'

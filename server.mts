@@ -167,30 +167,42 @@ app.prepare().then(() => {
         try {
           console.log('creating new chat');
           const chatId = String(new Date().getTime());
-          const contextMessage = {
-            from: {
-              username: 'Claude',
-              socketId: '0',
-              type: 'client',
+          const contextMessages = [
+            {
+              from: {
+                username: 'Claude',
+                socketId: '0',
+                type: 'client',
+              },
+              type: 'context',
+              text: `User question: ${question}`,
             },
-            type: 'context',
-            text: `User asked a question: ${question}. Please wait unitl client joins.`,
-          } as TMessage;
+            {
+              from: {
+                username: 'Claude',
+                socketId: '0',
+                type: 'client',
+              },
+              type: 'context',
+              text: `Please wait unitl client joins.`,
+            },
+          ] as TMessage[];
 
+          const lastMessage = contextMessages[contextMessages.length - 1];
           const newChatShorting = {
             id: chatId,
             createdAt: new Date(),
-            lastMessage: contextMessage,
+            lastMessage,
           } as TChatShorting;
 
           chatStore.createChat({
             id: chatId,
             createdAt: newChatShorting.createdAt,
-            messages: [contextMessage],
+            messages: contextMessages,
           });
 
           const agent = userStore.getUsers().find((u) => u.type === 'agent');
-          console.log({ agent });
+
           if (agent) {
             socket.to(agent.socketId).emit('new-client-chat', newChatShorting);
           }
@@ -296,6 +308,36 @@ app.prepare().then(() => {
       }
     );
 
+    socket.on('logout', ({ user }: { user: TUser }, callback) => {
+      try {
+        console.log(`Logout user`);
+        userStore.removeUser(user);
+        const socketRooms = chatStore
+          .getChats()
+          .filter((chat) =>
+            chat.messages.some((m) => m.from.socketId === socket.id)
+          );
+        socketRooms.forEach((room) => {
+          socket.to(room.id).emit('user_left', `${user.username} left`);
+          socket.leave(room.id);
+        });
+        return callback({
+          status: 'success',
+          message: 'Logout successful!',
+        });
+      } catch (e) {
+        console.log(e);
+        return callback({
+          status: 'success',
+          message: 'Error during logout.Please review server logs.',
+        });
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.log(`User disconnected: ${socket.id}`);
+    });
+
     //client events
 
     // agent events
@@ -378,10 +420,6 @@ app.prepare().then(() => {
     //     sendMessage(roomId, { from: sender.type, text: message });
     //   }
     // );
-
-    socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.id}`);
-    });
   });
 
   httpServer.listen(port, () => {

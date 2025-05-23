@@ -77,8 +77,16 @@ export default function AgentPage() {
   const [chats, setChats] = useState<TChatShorting[]>([]);
 
   const [user, setUser] = useState<TUser | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<TMessage[]>([]);
-  const isAuthenticated = user !== null;
+
+  useEffect(() => {
+    if (window) {
+      const userData = JSON.parse(localStorage.getItem('user') || 'null');
+      setIsAuthenticated(userData !== null);
+      setUser(userData);
+    }
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -111,10 +119,22 @@ export default function AgentPage() {
       ]);
     });
 
+    socket.on('user_left', (message) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          from: { username: '', type: 'client' },
+          type: 'system',
+          text: message,
+        },
+      ]);
+    });
+
     return () => {
       socket.off('new-client-chat');
       socket.off('message');
       socket.off('user_joined');
+      socket.off('user_left');
     };
   }, []);
 
@@ -143,53 +163,105 @@ export default function AgentPage() {
     }
   };
 
+  const handleLogout = () => {
+    if (window) {
+      socket
+        .emitWithAck('logout', {
+          user,
+        })
+        .then(
+          ({
+            status,
+            message,
+          }: {
+            status: 'success' | 'error';
+            message: string;
+          }) => {
+            if (status === 'success') {
+              toast.success(message);
+            } else {
+              toast.error(message);
+            }
+          }
+        )
+        .finally(() => {
+          setUser(null);
+          setIsAuthenticated(false);
+          localStorage.removeItem('user');
+        });
+    }
+  };
+
+  // if (!isAuthenticated || !user) return null;
+
   return (
     <div className='flex mt-24 justify-center w-full'>
-      {isAuthenticated ? (
-        <div className='flex gap-3'>
-          <div className='flex flex-col gap-4 w-[500px] mt-10 text-center p-2'>
-            {chats && chats.length > 0 ? (
-              chats.map((chat, i) => (
-                <ChatCard
-                  key={`client-chat-${i}`}
-                  onNameClick={() => setChatId(chat.id)}
-                  chat={chat}
-                />
-              ))
+      <div className='flex flex-col gap-1'>
+        {isAuthenticated && (
+          <div className='flex justify-end'>
+            <button
+              onClick={handleLogout}
+              className='px-4 py-2 h-fit bg-red-500 text-white font-bold rounded-lg'
+            >
+              <span>Log Out</span>
+            </button>
+          </div>
+        )}
+        {isAuthenticated ? (
+          <div className='flex gap-3'>
+            <div className='flex flex-col gap-4 w-[500px] mt-10 text-center p-2'>
+              {chats && chats.length > 0 ? (
+                chats.map((chat, i) => (
+                  <ChatCard
+                    key={`client-chat-${i}`}
+                    onNameClick={() => setChatId(chat.id)}
+                    chat={chat}
+                  />
+                ))
+              ) : (
+                <div className='flex h-full w-full justify-center items-center'>
+                  <h3>No chats created yet</h3>
+                </div>
+              )}
+            </div>
+            {chatId ? (
+              <div className='flex justify-center w-fit'>
+                <div className='w-fit mx-auto flex flex-col gap-1'>
+                  <h1 className='mb-4 text-2xl font-bold'>Chat: {chatId}</h1>
+                  <div className='h-[500px] w-[500px] overflow-y-auto p-4 mb-3 bg-gray-200 border2 rounded-lg'>
+                    {messages.map((msg, index) => (
+                      <ChatMessage
+                        key={index}
+                        message={msg}
+                        isOwnMessage={
+                          user?.type === msg.from.type &&
+                          user?.username === msg.from.username
+                        }
+                      />
+                    ))}
+                  </div>
+                  <ChatForm onSendMessage={handleSendMessage} />
+                </div>
+              </div>
             ) : (
-              <div className='flex h-full w-full justify-center items-center'>
-                <h3>No chats created yet</h3>
+              <div className='h-[500px] w-[500px] overflow-y-auto p-4 mb-4 bg-gray-200 border2 rounded-lg flex justify-center items-center'>
+                <h3 className='h-fit'>Chat is not selected yet</h3>
               </div>
             )}
           </div>
-          {chatId ? (
-            <div className='flex justify-center w-full'>
-              <div className='w-full mx-auto'>
-                <h1 className='mb-4 text-2xl font-bold'>Chat: {chatId}</h1>
-                <div className='h-[500px] w-[500px] overflow-y-auto p-4 mb-4 bg-gray-200 border2 rounded-lg'>
-                  {messages.map((msg, index) => (
-                    <ChatMessage
-                      key={index}
-                      message={msg}
-                      isOwnMessage={
-                        user.type === msg.from.type &&
-                        user.username === msg.from.username
-                      }
-                    />
-                  ))}
-                </div>
-                <ChatForm onSendMessage={handleSendMessage} />
-              </div>
-            </div>
-          ) : (
-            <div className='h-[500px] w-[500px] overflow-y-auto p-4 mb-4 bg-gray-200 border2 rounded-lg flex justify-center items-center'>
-              <h3 className='h-fit'>Chat is not selected yet</h3>
-            </div>
-          )}
-        </div>
-      ) : (
-        <AgentLoginForm onSuccess={(user) => setUser(user)} />
-      )}
+        ) : (
+          <AgentLoginForm
+            onSuccess={(user) => {
+              console.log({ user });
+              setUser(user);
+              setIsAuthenticated(true);
+              if (window) {
+                localStorage.setItem('user', JSON.stringify(user));
+              }
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }
