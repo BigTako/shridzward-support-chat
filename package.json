@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:socket": "cross-env NODE_OPTIONS=\"--loader ts-node/esm\" ts-node server.mts",
-    "build": "next build",
-    "start": "next start",
+    "build": "next build && tsc --project tsconfig.server.json",
+    "start": "cross-env NODE_ENV=\"production\" node dist/server.mjs",
     "lint": "next lint"
   },
   "dependencies": {
