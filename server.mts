@@ -75,7 +75,7 @@ class UserStore {
     return this;
   }
 
-  removeUser({ username, type }: TUser): this {
+  removeUser({ username, type }: TUserInfo): this {
     // keep only those that don't match both username+type
     this.users = this.users.filter(
       (u) => !(u.username === username && u.type === type)
@@ -334,6 +334,81 @@ app.prepare().then(() => {
         });
       }
     });
+
+    // admin
+    socket.on('get-users', (_, callback) => {
+      const users = userStore.getUsers();
+      callback(users);
+      // const { from, text } = message;
+      // console.log(`Message from ${from.username} in room ${chatId}: ${text}`);
+      // socket.to(chatId).emit('message', message);
+      // chatStore.sendMessage(chatId, message);
+    });
+
+    socket.on(
+      'delete-user',
+      ({ user }: { user: Omit<TUser, 'socketId'> }, callback) => {
+        try {
+          console.log(`Logout user`);
+          userStore.removeUser(user);
+          const socketRooms = chatStore
+            .getChats()
+            .filter((chat) =>
+              chat.messages.some((m) => m.from.socketId === socket.id)
+            );
+          socketRooms.forEach((room) => {
+            socket.to(room.id).emit('user_left', `${user.username} left`);
+            socket.leave(room.id);
+          });
+          userStore.removeUser(user);
+          return callback({
+            status: 'success',
+            message: 'Logout successful!',
+          });
+        } catch (e) {
+          console.log(e);
+          return callback({
+            status: 'success',
+            message: 'Error during logout.Please review server logs.',
+          });
+        }
+      }
+    );
+
+    socket.on(
+      'delete-chat',
+      ({ chatId }: { chatId: TChat['id'] }, callback) => {
+        try {
+          const chat = chatStore.getChat(chatId);
+          const users = chat?.messages.reduce((acc, cur) => {
+            const user = cur.from;
+            const alreadyIn = acc.some(
+              (u) => u.type === user.type && u.username === user.username
+            );
+            if (!alreadyIn) {
+              acc.push(user);
+            }
+            return acc;
+          }, [] as TUser[]);
+
+          users?.forEach((user) => {
+            socket.to(user.socketId).emit('leave-chat', { chatId });
+          });
+
+          chatStore.removeChat(chatId);
+          return callback({
+            status: 'success',
+            message: 'Chat deleted successfuly',
+          });
+        } catch (e) {
+          console.log(e);
+          return callback({
+            status: 'success',
+            message: 'Error during logout.Please review server logs.',
+          });
+        }
+      }
+    );
 
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${socket.id}`);

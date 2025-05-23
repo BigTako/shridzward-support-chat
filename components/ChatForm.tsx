@@ -4,7 +4,9 @@ import { useState } from 'react';
 
 const ChatForm = ({
   onSendMessage,
+  placeholder,
 }: {
+  placeholder?: string;
   onSendMessage: (message: string) => void;
 }) => {
   const [message, setMessage] = useState('');
@@ -20,7 +22,7 @@ const ChatForm = ({
     <form onSubmit={handleSubmit} className='max-w-full flex gap-2'>
       <input
         type='text'
-        placeholder='Type text...'
+        placeholder={placeholder || 'Type text...'}
         className='flex-1 px-4 border-2 py-2 rounded-lg focus:outline-none'
         value={message}
         onChange={(e) => setMessage(e.target.value)}
