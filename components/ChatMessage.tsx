@@ -22,9 +22,11 @@ const ChatMessage = ({ message, isOwnMessage }: ChatMessageProps) => {
 
   const messageType = isOwnMessage
     ? 'own'
-    : ['client', 'agent'].includes(type)
+    : type === 'user'
     ? 'opponent'
     : (type as keyof typeof messageStyleMap);
+
+  console.log({ text: message.text, messageType });
   return (
     <div
       className={`flex ${

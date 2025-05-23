@@ -252,7 +252,6 @@ export default function AgentPage() {
         ) : (
           <AgentLoginForm
             onSuccess={(user) => {
-              console.log({ user });
               setUser(user);
               setIsAuthenticated(true);
               if (window) {
