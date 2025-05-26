@@ -33,7 +33,7 @@ function ClientLoginForm({ onSuccess }: { onSuccess: (user: TUser) => void }) {
 
   return (
     <div className='flex flex-col gap-4 w-[500px] text-center'>
-      <h2 className='text-[24px] font-bold'>Login</h2>
+      <h2 className='text-[24px] font-bold'>How should we call you?</h2>
       <form
         onSubmit={async (e) => {
           e.preventDefault();

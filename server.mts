@@ -55,6 +55,12 @@ type TChatShorting = Pick<TChat, 'id' | 'createdAt'> & {
 
 type TUserInfo = Pick<TUser, 'username' | 'type'>;
 
+type TCreateChatPayload = {
+  question: string;
+  username: string;
+  context?: string;
+};
+
 class UserStore {
   users: TUser[] = [];
 
@@ -69,7 +75,9 @@ class UserStore {
   addUser(user: TUser): this {
     // replace any existing same‐username user, then append
     this.users = [
-      ...this.users.filter((u) => u.username !== user.username),
+      ...this.users.filter(
+        (u) => u.username !== user.username && u.type !== user.type
+      ),
       user,
     ];
     return this;
@@ -158,7 +166,7 @@ app.prepare().then(() => {
     // ai events
     socket.on(
       'create-new-chat',
-      ({ question }: { question: string }, callback) => {
+      ({ question, username, context }: TCreateChatPayload, callback) => {
         try {
           console.log('creating new chat');
           const chatId = String(new Date().getTime());
@@ -170,7 +178,16 @@ app.prepare().then(() => {
                 type: 'client',
               },
               type: 'context',
-              text: `User question: ${question}`,
+              text: `User question context: ${context}`,
+            },
+            {
+              from: {
+                username: 'Claude',
+                socketId: '0',
+                type: 'client',
+              },
+              type: 'context',
+              text: `User(${username}) question: ${question}`,
             },
             {
               from: {
@@ -197,7 +214,6 @@ app.prepare().then(() => {
           });
 
           const agent = userStore.getUsers().find((u) => u.type === 'agent');
-
           if (agent) {
             socket.to(agent.socketId).emit('new-client-chat', newChatShorting);
           }
@@ -216,6 +232,32 @@ app.prepare().then(() => {
         }
       }
     );
+
+    socket.on('refresh-agent', ({}, callback) => {
+      try {
+        console.log('refresh-agent');
+        const agent = userStore.getUsers().find((u) => u.type === 'agent') || {
+          username: process.env.AGENT_LOGIN,
+          type: 'agent',
+        };
+        const agentCopy = JSON.parse(
+          JSON.stringify({ ...agent, socketId: socket.id })
+        );
+
+        userStore.addUser(agentCopy); // upsert agent
+
+        callback({
+          status: 'success',
+          message: 'Agent refreshed',
+        });
+      } catch (e) {
+        console.log({ e });
+        callback({
+          status: 'error',
+          message: 'Error refreshing agent.Please review server logs.',
+        });
+      }
+    });
 
     socket.on(
       'login',
@@ -290,7 +332,7 @@ app.prepare().then(() => {
           console.log(`${user.username} joined room ${chatId}`);
           const isAgent = user.type === 'agent';
           console.log({ isAgent });
-          callback(
+          callback?.(
             isAgent
               ? chat.messages
               : chat.messages.filter((m) => m.type !== 'context')

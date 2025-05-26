@@ -81,11 +81,18 @@ export default function AgentPage() {
   const [messages, setMessages] = useState<TMessage[]>([]);
 
   useEffect(() => {
-    if (window) {
-      const userData = JSON.parse(localStorage.getItem('user') || 'null');
-      setIsAuthenticated(userData !== null);
-      setUser(userData);
+    async function checkoutAgent() {
+      if (window) {
+        const userData = JSON.parse(localStorage.getItem('user') || 'null');
+        setIsAuthenticated(userData !== null);
+        setUser(userData);
+        await socket
+          .emitWithAck('refresh-agent', {})
+          .then(() => console.log('Agent refreshed'))
+          .catch(() => console.log('Failed to refresh agent'));
+      }
     }
+    checkoutAgent();
   }, []);
 
   useEffect(() => {
@@ -99,7 +106,7 @@ export default function AgentPage() {
 
   useEffect(() => {
     socket.on('new-client-chat', (data: TChatShorting) => {
-      console.log(' received chat from socket');
+      console.log('received chat from socket');
       setChats((prev) => [data, ...prev]);
     });
 
