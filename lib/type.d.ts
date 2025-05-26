@@ -1,22 +1,25 @@
-export type TMessageType = 'user' | 'system' | 'context';
+type TMessageType = 'user' | 'system' | 'agent-only' | 'client-only';
 
-export type TUserType = 'client' | 'agent';
+type TUserType = 'client' | 'agent';
 
-export type TUser = {
+type TUser = {
   username: string;
-  // socketId: string;
+  socketId: string;
   type: TUserType;
 };
 
-export type TMessage = {
+type TUserInfo = Pick<TUser, 'username' | 'type'>;
+
+type TMessage = {
   from: TUser;
   type: TMessageType;
   text: string;
 };
 
-export type TChat = {
+type TChat = {
   id: string;
   createdAt: Date;
+  members: TUser[];
   messages: TMessage[];
 };
 

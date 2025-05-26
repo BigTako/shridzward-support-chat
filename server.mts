@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import next from 'next';
 import { Server } from 'socket.io';
+import { TChat, TChatShorting, TMessage, TUser, TUserInfo } from './lib/type';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';
@@ -8,52 +9,6 @@ const port = parseInt(process.env.PORT || '3000', 10);
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
-
-type TMessageType = 'user' | 'system' | 'context';
-
-type TUserType = 'client' | 'agent';
-
-type TUser = {
-  username: string;
-  socketId: string;
-  type: TUserType;
-};
-
-type TMessage = {
-  from: TUser;
-  type: TMessageType;
-  text: string;
-};
-
-type TChat = {
-  id: string;
-  createdAt: Date;
-  messages: TMessage[];
-};
-
-// interface IUserStore {
-//   users: TUser[];
-//   getUsers: () => TUser[];
-//   getUser: (user: TUser) => TUser | undefined;
-//   addUser: (user: TUser) => IUserStore;
-//   removeUser: (user: TUser) => IUserStore;
-// }
-
-// interface IChatsStore {
-//   chats: TChat[];
-//   getChats: () => TChat[];
-//   getChat: (chatId: TChat['id']) => TChat | undefined;
-//   getOrCreateChat: (chatId: TChat['id']) => TChat;
-//   createChat: (data: TChat) => IChatsStore;
-//   removeChat: (chatId: TChat['id']) => IChatsStore;
-//   sendMessage: (chatId: TChat['id'], message: TMessage) => IChatsStore;
-// }
-
-type TChatShorting = Pick<TChat, 'id' | 'createdAt'> & {
-  lastMessage: TMessage;
-};
-
-type TUserInfo = Pick<TUser, 'username' | 'type'>;
 
 type TCreateChatPayload = {
   question: string;
@@ -117,7 +72,7 @@ class ChatsStore {
   getOrCreateChat(chatId: string): TChat {
     let chat = this.getChat(chatId);
     if (!chat) {
-      chat = { id: chatId, createdAt: new Date(), messages: [] };
+      chat = { id: chatId, members: [], createdAt: new Date(), messages: [] };
       this.chats.push(chat);
     }
     return chat;
@@ -141,17 +96,6 @@ class ChatsStore {
     return this;
   }
 }
-
-// let agentSocketId: string;
-
-// const rooms: { [key: TRoom['roomId']]: TRoom } = {};
-
-// function sendMessage(roomId: TRoom['roomId'], message: TMessage) {
-//   const room = rooms[roomId];
-//   if (room) {
-//     room.messages = [...room.messages, message];
-//   }
-// }
 
 app.prepare().then(() => {
   const httpServer = createServer(handle);
@@ -177,8 +121,8 @@ app.prepare().then(() => {
                 socketId: '0',
                 type: 'client',
               },
-              type: 'context',
-              text: `User question context: ${context}`,
+              type: 'agent-only',
+              text: `Context: ${context}`,
             },
             {
               from: {
@@ -186,8 +130,8 @@ app.prepare().then(() => {
                 socketId: '0',
                 type: 'client',
               },
-              type: 'context',
-              text: `User(${username}) question: ${question}`,
+              type: 'agent-only',
+              text: `${username} is asking: ${question}`,
             },
             {
               from: {
@@ -195,8 +139,8 @@ app.prepare().then(() => {
                 socketId: '0',
                 type: 'client',
               },
-              type: 'context',
-              text: `Please wait unitl client joins.`,
+              type: 'client-only',
+              text: `Hey there, ${username}! Nice to meet you again😃 No worries, agent will join soon and answer jour question!`,
             },
           ] as TMessage[];
 
@@ -207,16 +151,22 @@ app.prepare().then(() => {
             lastMessage,
           } as TChatShorting;
 
-          chatStore.createChat({
-            id: chatId,
-            createdAt: newChatShorting.createdAt,
-            messages: contextMessages,
-          });
+          const chatMembers = [
+            { username, type: 'client', socketId: socket.id },
+          ] as TUser[];
 
           const agent = userStore.getUsers().find((u) => u.type === 'agent');
           if (agent) {
             socket.to(agent.socketId).emit('new-client-chat', newChatShorting);
+            chatMembers.push(agent);
           }
+
+          chatStore.createChat({
+            id: chatId,
+            members: chatMembers,
+            createdAt: newChatShorting.createdAt,
+            messages: contextMessages,
+          });
 
           callback({
             status: 'success',
@@ -258,6 +208,25 @@ app.prepare().then(() => {
         });
       }
     });
+
+    socket.on(
+      'get-client-data',
+      ({ chatId }: { chatId: TChat['id'] }, callback) => {
+        try {
+          const chat = chatStore.getChat(chatId);
+          if (chat) {
+            const userData = chat.members.find((u) => u.type === 'client');
+            callback?.(userData);
+          }
+        } catch (e) {
+          console.log({ e });
+          callback({
+            status: 'error',
+            message: 'Error refreshing agent.Please review server logs.',
+          });
+        }
+      }
+    );
 
     socket.on(
       'login',
@@ -325,18 +294,27 @@ app.prepare().then(() => {
         const chat = chatStore.getChat(chatId);
 
         if (chat) {
+          const isMember = chat.members.some(
+            (u) => u.type === user.type && u.username === user.username
+          );
+          if (!isMember) {
+            chat.members = [...chat.members, user];
+          }
           socket.join(chatId);
           socket
             .to(chatId)
             .emit('user_joined', `${user.username} joined room `);
           console.log(`${user.username} joined room ${chatId}`);
           const isAgent = user.type === 'agent';
-          console.log({ isAgent });
-          callback?.(
-            isAgent
-              ? chat.messages
-              : chat.messages.filter((m) => m.type !== 'context')
-          );
+
+          const chatInfo = {
+            ...chat,
+            messages: isAgent
+              ? chat.messages.filter((m) => m.type !== 'client-only')
+              : chat.messages.filter((m) => m.type !== 'agent-only'),
+          } as TChat;
+
+          callback?.(chatInfo);
         }
       }
     );

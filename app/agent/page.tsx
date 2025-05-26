@@ -8,7 +8,11 @@ import { TChat, TChatShorting, TMessage, TUser } from '@/lib/type';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
-function AgentLoginForm({ onSuccess }: { onSuccess: (user: TUser) => void }) {
+function AgentLoginForm({
+  onSuccess,
+}: {
+  onSuccess: (user: Omit<TUser, 'socketId'>) => void;
+}) {
   const handleLogin = async (username: string, password: string) => {
     const result = (await socket.emitWithAck('login', {
       username,
@@ -119,7 +123,7 @@ export default function AgentPage() {
       setMessages((prev) => [
         ...prev,
         {
-          from: { username: '', type: 'client' },
+          from: { username: '', type: 'client', socketId: socket?.id || '' },
           type: 'system',
           text: message,
         },
@@ -130,7 +134,7 @@ export default function AgentPage() {
       setMessages((prev) => [
         ...prev,
         {
-          from: { username: '', type: 'client' },
+          from: { username: '', type: 'client', socketId: socket?.id || '' },
           type: 'system',
           text: message,
         },
@@ -147,14 +151,12 @@ export default function AgentPage() {
 
   useEffect(() => {
     if (isAuthenticated && chatId) {
-      socket
-        .emitWithAck('join-chat', { chatId, user })
-        .then((data: TMessage[]) => {
-          setMessages((prev) => [
-            ...prev.filter((m) => m.type === 'system'),
-            ...data,
-          ]);
-        });
+      socket.emitWithAck('join-chat', { chatId, user }).then((chat: TChat) => {
+        setMessages((prev) => [
+          ...prev.filter((m) => m.type === 'system'),
+          ...chat.messages,
+        ]);
+      });
     }
   }, [isAuthenticated, chatId, user]);
 
@@ -259,7 +261,7 @@ export default function AgentPage() {
         ) : (
           <AgentLoginForm
             onSuccess={(user) => {
-              setUser(user);
+              setUser({ ...user, socketId: socket?.id || '' });
               setIsAuthenticated(true);
               if (window) {
                 localStorage.setItem('user', JSON.stringify(user));

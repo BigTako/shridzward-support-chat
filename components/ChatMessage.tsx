@@ -13,7 +13,8 @@ const ChatMessage = ({ message, isOwnMessage }: ChatMessageProps) => {
   const messageStyleMap = useMemo(
     () => ({
       system: 'bg-gray-800 text-white text-center text-xs',
-      context: 'bg-orange-500 text-white',
+      ['agent-only']: 'bg-orange-500 text-white',
+      ['client-only']: 'bg-green-400 text-white',
       own: 'bg-blue-500 text-white',
       opponent: 'bg-white text-black',
     }),
