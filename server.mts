@@ -114,8 +114,10 @@ app.prepare().then(() => {
         try {
           console.log('creating new chat');
           const chatId = String(new Date().getTime());
-          const contextMessages = [
-            {
+          let contextMessages = [];
+
+          if (context) {
+            contextMessages.push({
               from: {
                 username: 'Claude',
                 socketId: '0',
@@ -123,7 +125,11 @@ app.prepare().then(() => {
               },
               type: 'agent-only',
               text: `Context: ${context}`,
-            },
+            });
+          }
+
+          contextMessages = [
+            ...contextMessages,
             {
               from: {
                 username: 'Claude',
