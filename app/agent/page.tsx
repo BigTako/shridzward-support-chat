@@ -4,7 +4,13 @@ import { ChatCard } from '@/components/ChatCard';
 import ChatForm from '@/components/ChatForm';
 import ChatMessage from '@/components/ChatMessage';
 import { socket } from '@/lib/socketClient';
-import { TChat, TChatShorting, TMessage, TUser } from '@/lib/type';
+import {
+  TChat,
+  TChatShorting,
+  TMessage,
+  TSupportChatShorting,
+  TUser,
+} from '@/lib/type';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
@@ -78,7 +84,7 @@ function AgentLoginForm({
 export default function AgentPage() {
   const [chatId, setChatId] = useState<TChat['id'] | null>(null);
 
-  const [chats, setChats] = useState<TChatShorting[]>([]);
+  const [chats, setChats] = useState<TSupportChatShorting[]>([]);
 
   const [user, setUser] = useState<TUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -101,45 +107,47 @@ export default function AgentPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      socket.emitWithAck('get-chats', {}).then((data: TChatShorting[]) => {
-        console.log({ data });
-        setChats(data);
-      });
+      socket
+        .emitWithAck('get-chats', {})
+        .then((data: TSupportChatShorting[]) => {
+          console.log({ data });
+          setChats(data);
+        });
     }
   }, [isAuthenticated]);
 
   useEffect(() => {
-    socket.on('new-client-chat', (data: TChatShorting) => {
+    socket.on('new-client-chat', (data: TSupportChatShorting) => {
       console.log('received chat from socket');
       setChats((prev) => [data, ...prev]);
     });
 
-    socket.on('message', (data) => {
-      console.log(' received message from socket');
-      setMessages((prev) => [...prev, data]);
-    });
+    // socket.on('message', (data) => {
+    //   console.log(' received message from socket');
+    //   setMessages((prev) => [...prev, data]);
+    // });
 
-    socket.on('user_joined', (message) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          from: { username: '', type: 'client', socketId: socket?.id || '' },
-          type: 'system',
-          text: message,
-        },
-      ]);
-    });
+    // socket.on('user_joined', (message) => {
+    //   setMessages((prev) => [
+    //     ...prev,
+    //     {
+    //       from: { username: '', type: 'client', socketId: socket?.id || '' },
+    //       type: 'system',
+    //       text: message,
+    //     },
+    //   ]);
+    // });
 
-    socket.on('user_left', (message) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          from: { username: '', type: 'client', socketId: socket?.id || '' },
-          type: 'system',
-          text: message,
-        },
-      ]);
-    });
+    // socket.on('user_left', (message) => {
+    //   setMessages((prev) => [
+    //     ...prev,
+    //     {
+    //       from: { username: '', type: 'client', socketId: socket?.id || '' },
+    //       type: 'system',
+    //       text: message,
+    //     },
+    //   ]);
+    // });
 
     return () => {
       socket.off('new-client-chat');
@@ -149,28 +157,28 @@ export default function AgentPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (isAuthenticated && chatId) {
-      socket.emitWithAck('join-chat', { chatId, user }).then((chat: TChat) => {
-        setMessages((prev) => [
-          ...prev.filter((m) => m.type === 'system'),
-          ...chat.messages,
-        ]);
-      });
-    }
-  }, [isAuthenticated, chatId, user]);
+  // useEffect(() => {
+  //   if (isAuthenticated && chatId) {
+  //     socket.emitWithAck('join-chat', { chatId, user }).then((chat: TChat) => {
+  //       setMessages((prev) => [
+  //         ...prev.filter((m) => m.type === 'system'),
+  //         ...chat.messages,
+  //       ]);
+  //     });
+  //   }
+  // }, [isAuthenticated, chatId, user]);
 
-  const handleSendMessage = (messageText: string) => {
-    if (user && chatId) {
-      const message = {
-        type: 'user',
-        text: messageText,
-        from: user,
-      } as TMessage;
-      socket.emit('message', { chatId, message });
-      setMessages((prev) => [...prev, message]);
-    }
-  };
+  // const handleSendMessage = (messageText: string) => {
+  //   if (user && chatId) {
+  //     const message = {
+  //       type: 'user',
+  //       text: messageText,
+  //       from: user,
+  //     } as TMessage;
+  //     socket.emit('message', { chatId, message });
+  //     setMessages((prev) => [...prev, message]);
+  //   }
+  // };
 
   const handleLogout = () => {
     if (window) {
@@ -201,6 +209,9 @@ export default function AgentPage() {
     }
   };
 
+  const handleSendMessage = (message: string) => {
+    console.log({ message });
+  };
   // if (!isAuthenticated || !user) return null;
 
   return (

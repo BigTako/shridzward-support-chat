@@ -26,3 +26,42 @@ type TChat = {
 export type TChatShorting = Pick<TChat, 'id' | 'createdAt'> & {
   lastMessage: TMessage;
 };
+
+type TSupportChat = {
+  id: string;
+  members: TSupportUser['id'][];
+  userQuestion: string;
+  context?: string;
+  createdAt: Date;
+};
+
+export type TSupportChatPopulated = Omit<TSupportChat, 'members'> & {
+  members?: TSupportUser;
+  messages?: TSupportMessage[];
+};
+
+export type TSupportUser = {
+  id: string;
+  username: string;
+  socketId: string;
+  type: TUserType;
+  createdAt: Date;
+};
+
+export type TSupportMessage = {
+  id: string;
+  chatId: TSupportChat['id'];
+  senderId: TSupportUser['id'];
+  type: TMessageType;
+  text: string;
+  createdAt: Date;
+};
+
+export type TSupportMessagePopulated = TSupportMessage & {
+  sender?: TSupportUser;
+  chat?: TSupportChat;
+};
+
+export type TSupportChatShorting = Pick<TSupportChat, 'id' | 'createdAt'> & {
+  lastMessage: TSupportMessagePopulated;
+};

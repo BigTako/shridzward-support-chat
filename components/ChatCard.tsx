@@ -1,14 +1,14 @@
 'use client';
-import { TChatShorting } from '@/lib/type';
+import { TSupportChatShorting } from '@/lib/type';
 import Image from 'next/image';
 
 type Props = {
-  chat: TChatShorting;
+  chat: TSupportChatShorting;
   onNameClick: () => void;
 };
 
 export function ChatCard({ chat, onNameClick }: Props) {
-  const from = chat.lastMessage?.from?.username || 'Anonymous';
+  const from = chat.lastMessage?.sender?.username || 'Anonymous';
   const lastMessage = chat.lastMessage?.text || '...';
   console.log({ chat });
   return (
