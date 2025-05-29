@@ -2,15 +2,13 @@ import { createServer } from 'node:http';
 import next from 'next';
 import { Server } from 'socket.io';
 import {
+  EnvVars,
   TChat,
-  TChatShorting,
-  TMessage,
   TSupportChat,
   TSupportChatShorting,
   TSupportMessage,
   TSupportMessagePopulated,
   TSupportUser,
-  TUser,
   TUserInfo,
 } from './lib/type';
 import { google } from 'googleapis';
@@ -28,113 +26,6 @@ type TCreateChatPayload = {
   username: string;
   context?: string;
 };
-
-interface EnvVars {
-  GOOGLE_CLIENT_EMAIL: string;
-  GOOGLE_CLIENT_PRIVATE_KEY: string;
-  SPREADSHEET_ID: string;
-  HOSTNAME: string;
-  PORT: string;
-  AGENT_LOGIN: string;
-  AGENT_PASSWORD: string;
-}
-
-class UserStore {
-  users: TUser[] = [];
-
-  getUsers(): TUser[] {
-    return this.users;
-  }
-
-  getUser({ username, type }: TUserInfo): TUser | undefined {
-    return this.users.find((u) => u.username === username && u.type === type);
-  }
-
-  addUser(user: TUser): this {
-    // replace any existing same‐username user, then append
-    this.users = [
-      ...this.users.filter(
-        (u) => u.username !== user.username && u.type !== user.type
-      ),
-      user,
-    ];
-    return this;
-  }
-
-  removeUser({ username, type }: TUserInfo): this {
-    // keep only those that don't match both username+type
-    this.users = this.users.filter(
-      (u) => !(u.username === username && u.type === type)
-    );
-    return this;
-  }
-}
-
-class ChatsStore {
-  chats: TChat[] = [];
-
-  getChats(): TChat[] {
-    return this.chats;
-  }
-
-  getShortings(): TChatShorting[] {
-    return this.chats.map((chat) => {
-      const lastMessage = chat.messages[chat.messages.length - 1];
-      return {
-        ...chat,
-        messages: undefined,
-        lastMessage,
-      };
-    });
-  }
-
-  getChat(chatId: string): TChat | undefined {
-    return this.chats.find((c) => c.id === chatId);
-  }
-
-  // getOrCreateChat(chatId: string): TChat {
-  //   let chat = this.getChat(chatId);
-  //   if (!chat) {
-  //     chat = { id: chatId, members: [], createdAt: new Date(), messages: [] };
-  //     this.chats.push(chat);
-  //   }
-  //   return chat;
-  // }
-
-  createChat(data: TChat): this {
-    this.chats.push(data);
-    return this;
-  }
-
-  removeChat(chatId: string): this {
-    this.chats = this.chats.filter((c) => c.id !== chatId);
-    return this;
-  }
-
-  sendMessage(chatId: string, message: TMessage): this {
-    const chat = this.getChat(chatId);
-    if (chat) {
-      chat.messages = [...chat.messages, message];
-    }
-    return this;
-  }
-}
-
-function getEnvVar(key: keyof EnvVars) {
-  const env = process.env as unknown as EnvVars;
-  return env[key]?.replace(/\\n/g, '\n');
-}
-
-function getFormattedTimestamp() {
-  const now = new Date();
-  const YYYY = now.getFullYear();
-  const MM = String(now.getMonth() + 1).padStart(2, '0');
-  const DD = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mm = String(now.getMinutes()).padStart(2, '0');
-  const ss = String(now.getSeconds()).padStart(2, '0');
-  return `${YYYY}-${MM}-${DD} ${hh}:${mm}:${ss}`;
-}
 
 class GoogleSheetsRepository {
   constructor() {}
@@ -214,7 +105,7 @@ class GoogleSheetsRepository {
   }
 }
 
-class SheetChatStore {
+class ChatStore {
   private static tabName = 'Chats';
   private static dataRange = 'A:E';
   constructor(private sheetRepo: GoogleSheetsRepository) {}
@@ -238,7 +129,7 @@ class SheetChatStore {
 
     const { sheetApi, auth } = await this.sheetRepo.getSpreadSheetApi();
 
-    const range = `${SheetChatStore.tabName}!${SheetChatStore.dataRange}`;
+    const range = `${ChatStore.tabName}!${ChatStore.dataRange}`;
 
     // Read rows from spreadsheet
     const rows = await sheetApi.spreadsheets.values.get({
@@ -286,7 +177,7 @@ class SheetChatStore {
         createdAt: getFormattedTimestamp(),
       };
 
-      const range = `${SheetChatStore.tabName}!${SheetChatStore.dataRange}`;
+      const range = `${ChatStore.tabName}!${ChatStore.dataRange}`;
 
       await sheetApi.spreadsheets.values.append({
         spreadsheetId: getEnvVar('SPREADSHEET_ID'),
@@ -363,7 +254,7 @@ class SheetChatStore {
   }
 }
 
-class SheetMessageStore {
+class MessageStore {
   private static tabName = 'Messages';
   private static dataRange = 'A:F';
 
@@ -393,7 +284,7 @@ class SheetMessageStore {
 
     const { sheetApi, auth } = await this.sheetRepo.getSpreadSheetApi();
     // const sheetName = 'Messages';
-    const range = `${SheetMessageStore.tabName}!${SheetMessageStore.dataRange}`;
+    const range = `${MessageStore.tabName}!${MessageStore.dataRange}`;
     // Read rows from spreadsheet
     const rows = await sheetApi.spreadsheets.values.get({
       auth,
@@ -445,7 +336,7 @@ class SheetMessageStore {
         createdAt: getFormattedTimestamp(),
       };
 
-      const range = `${SheetMessageStore.tabName}!${SheetMessageStore.dataRange}`;
+      const range = `${MessageStore.tabName}!${MessageStore.dataRange}`;
 
       await sheetApi.spreadsheets.values.append({
         spreadsheetId: getEnvVar('SPREADSHEET_ID'),
@@ -485,7 +376,7 @@ class SheetMessageStore {
       });
       const sheets = meta.data.sheets || [];
       const sheet = sheets.find(
-        (s) => s.properties?.title === SheetMessageStore.tabName
+        (s) => s.properties?.title === MessageStore.tabName
       );
       if (!sheet || !sheet.properties?.sheetId) {
         return false;
@@ -516,106 +407,7 @@ class SheetMessageStore {
   }
 }
 
-class SheetJoinService {
-  constructor(
-    private chatStore: SheetChatStore,
-    private userStore: SheetUserStore,
-    private messageStore: SheetMessageStore
-  ) {}
-
-  async populateMessages({
-    messages,
-    fields,
-  }: {
-    messages: TSupportMessage[];
-    fields: ('chat' | 'sender')[];
-  }) {
-    const populatedMessages = [];
-    let chats;
-    let users;
-    if (fields.includes('chat')) {
-      const chatIds = messages.map((m) => m.chatId);
-      chats = await this.chatStore.getChats({ id: { in: chatIds } });
-    }
-    if (fields.includes('sender')) {
-      const senderIds = messages.map((m) => m.senderId);
-      users = await this.userStore.getUsers({ id: { in: senderIds } });
-    }
-    // if chat is fields - get chatIds and chats by that ids, attach chat
-    for (const message of messages) {
-      const body = { ...message } as TSupportMessagePopulated;
-      if (fields.includes('chat')) {
-        const chat = chats?.find((c) => c.id === message.chatId);
-        if (chat) {
-          body['chat'] = chat;
-        }
-      }
-      if (fields.includes('sender')) {
-        const sender = users?.find((s) => s.id === message.senderId);
-        if (sender) {
-          body['sender'] = sender;
-        }
-      }
-      populatedMessages.push(body);
-    }
-
-    return populatedMessages;
-  }
-
-  async getChatShortings() {
-    const chats = await this.chatStore.getChats();
-    const chatIds = chats.map((c) => c.id);
-    const messages = await this.messageStore.getMessages({
-      chatId: { in: chatIds },
-    });
-
-    console.log({ messages: JSON.stringify(messages, undefined, 4) });
-
-    const lastMessages = chats.map((chat) => {
-      const chatMessages = messages.filter((m) => m.chatId === chat.id);
-      return chatMessages[chatMessages.length - 1];
-    });
-
-    const populatedLastMessages = await this.populateMessages({
-      messages: lastMessages,
-      fields: ['sender'],
-    });
-
-    return chats.map((chat) => {
-      const lastMessage = populatedLastMessages.find(
-        (m) => m.chatId === chat.id
-      );
-      return {
-        id: chat.id,
-        createdAt: new Date(chat.createdAt),
-        lastMessage,
-      };
-    });
-  }
-
-  // async getChatMessages(chatId: TSupportChat['id']) {
-  //   const messages = await this.messageStore.getMessages()
-  // }
-
-  async getChatMessagesPopulated(chatId: TSupportChat['id']) {
-    const messages = await this.messageStore.getMessages({ chatId });
-    return await this.populateMessages({ messages, fields: ['sender'] });
-  }
-
-  async sendMessage(body: Omit<TSupportMessage, 'id' | 'createdAt'>) {
-    const message = await this.messageStore.createMessage(body);
-    if (message) {
-      const [populatedMessage] = await this.populateMessages({
-        messages: [message],
-        fields: ['sender'],
-      });
-      return populatedMessage;
-    }
-    return null;
-  }
-}
-
-class SheetUserStore {
+class UserStore {
   constructor(private sheetRepo: GoogleSheetsRepository) {}
 
   async getUsers(filter?: { id?: { in?: string[] } }): Promise<TSupportUser[]> {
@@ -848,15 +640,125 @@ class SheetUserStore {
   }
 }
 
+class JoinService {
+  constructor(
+    private chatStore: ChatStore,
+    private userStore: UserStore,
+    private messageStore: MessageStore
+  ) {}
+
+  async populateMessages({
+    messages,
+    fields,
+  }: {
+    messages: TSupportMessage[];
+    fields: ('chat' | 'sender')[];
+  }) {
+    const populatedMessages = [];
+    let chats;
+    let users;
+    if (fields.includes('chat')) {
+      const chatIds = messages.map((m) => m.chatId);
+      chats = await this.chatStore.getChats({ id: { in: chatIds } });
+    }
+    if (fields.includes('sender')) {
+      const senderIds = messages.map((m) => m.senderId);
+      users = await this.userStore.getUsers({ id: { in: senderIds } });
+    }
+    // if chat is fields - get chatIds and chats by that ids, attach chat
+    for (const message of messages) {
+      const body = { ...message } as TSupportMessagePopulated;
+      if (fields.includes('chat')) {
+        const chat = chats?.find((c) => c.id === message.chatId);
+        if (chat) {
+          body['chat'] = chat;
+        }
+      }
+      if (fields.includes('sender')) {
+        const sender = users?.find((s) => s.id === message.senderId);
+        if (sender) {
+          body['sender'] = sender;
+        }
+      }
+      populatedMessages.push(body);
+    }
+
+    return populatedMessages;
+  }
+
+  async getChatShortings() {
+    const chats = await this.chatStore.getChats();
+    const chatIds = chats.map((c) => c.id);
+    const messages = await this.messageStore.getMessages({
+      chatId: { in: chatIds },
+    });
+
+    console.log({ messages: JSON.stringify(messages, undefined, 4) });
+
+    const lastMessages = chats.map((chat) => {
+      const chatMessages = messages.filter((m) => m.chatId === chat.id);
+      return chatMessages[chatMessages.length - 1];
+    });
+
+    const populatedLastMessages = await this.populateMessages({
+      messages: lastMessages,
+      fields: ['sender'],
+    });
+
+    return chats.map((chat) => {
+      const lastMessage = populatedLastMessages.find(
+        (m) => m.chatId === chat.id
+      );
+      return {
+        id: chat.id,
+        createdAt: new Date(chat.createdAt),
+        lastMessage,
+      };
+    });
+  }
+  async getChatMessagesPopulated(chatId: TSupportChat['id']) {
+    const messages = await this.messageStore.getMessages({ chatId });
+    return await this.populateMessages({ messages, fields: ['sender'] });
+  }
+
+  async sendMessage(body: Omit<TSupportMessage, 'id' | 'createdAt'>) {
+    const message = await this.messageStore.createMessage(body);
+    if (message) {
+      const [populatedMessage] = await this.populateMessages({
+        messages: [message],
+        fields: ['sender'],
+      });
+      return populatedMessage;
+    }
+    return null;
+  }
+}
+
+export function getEnvVar(key: keyof EnvVars) {
+  const env = process.env as unknown as EnvVars;
+  return env[key]?.replace(/\\n/g, '\n');
+}
+
+export function getFormattedTimestamp() {
+  const now = new Date();
+  const YYYY = now.getFullYear();
+  const MM = String(now.getMonth() + 1).padStart(2, '0');
+  const DD = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  return `${YYYY}-${MM}-${DD} ${hh}:${mm}:${ss}`;
+}
+
 app.prepare().then(async () => {
   const httpServer = createServer(handle);
   const io = new Server(httpServer);
 
   const sheetsRepo = new GoogleSheetsRepository();
-  const sheetChatStore = new SheetChatStore(sheetsRepo);
-  const sheetUserStore = new SheetUserStore(sheetsRepo);
-  const sheetMessageStore = new SheetMessageStore(sheetsRepo);
-  const sheetJoinService = new SheetJoinService(
+  const sheetChatStore = new ChatStore(sheetsRepo);
+  const sheetUserStore = new UserStore(sheetsRepo);
+  const sheetMessageStore = new MessageStore(sheetsRepo);
+  const sheetJoinService = new JoinService(
     sheetChatStore,
     sheetUserStore,
     sheetMessageStore
@@ -915,9 +817,6 @@ app.prepare().then(async () => {
   function agentIsLoggedIn() {
     return agentUser && agentUser.socketId !== '0';
   }
-
-  const chatStore = new ChatsStore();
-  const userStore = new UserStore();
 
   io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
@@ -1300,12 +1199,6 @@ app.prepare().then(async () => {
           });
         }
       }
-      // await sheetUserStore.removeUserBySocketId(socket.id).then((isSuccess) => {
-      //   if (isSuccess) {
-      //   } else {
-      //     console.log(`Failed to disconnect and removed: ${socket.id}`);
-      //   }
-      // });
     });
   });
 
