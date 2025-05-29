@@ -70,3 +70,11 @@ export type TSupportMessagePopulated = TSupportMessage & {
 export type TSupportChatShorting = Pick<TSupportChat, 'id' | 'createdAt'> & {
   lastMessage: TSupportMessagePopulated;
 };
+
+export type AuthResponcePayload = {
+  status: 'success' | 'error';
+  message: string;
+  _meta?: {
+    user: TSupportUser;
+  };
+};

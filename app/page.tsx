@@ -2,9 +2,15 @@
 import { socket } from '@/lib/socketClient';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { TChat, TMessage, TUser } from '@/lib/type';
+import {
+  AuthResponcePayload,
+  TSupportChatPopulated,
+  TSupportMessagePopulated,
+  TSupportUser,
+} from '@/lib/type';
 import ChatMessage from '@/components/ChatMessage';
 import ChatForm from '@/components/ChatForm';
+import toast from 'react-hot-toast';
 
 // function ClientLoginForm({ onSuccess }: { onSuccess: (user: TUser) => void }) {
 //   const handleLogin = async (username: string) => {
@@ -64,20 +70,48 @@ export default function Home() {
 
   const chatId = searchParams.get('chat');
 
-  const [messages, setMessages] = useState<TMessage[]>([]);
+  const [messages, setMessages] = useState<TSupportMessagePopulated[]>([]);
 
-  const [user, setUser] = useState<TUser | null>(null);
+  const [user, setUser] = useState<TSupportUser | null>(null);
+
+  const isAuthenticated = user !== null;
 
   useEffect(() => {
-    if (user && chatId) {
-      socket.emitWithAck('join-chat', { chatId, user }).then((chat: TChat) => {
-        setMessages((prev) => [
-          ...prev.filter((m) => m.type === 'system'),
-          ...chat.messages,
-        ]);
-      });
+    async function checkoutUser() {
+      if (window) {
+        const userId = localStorage.getItem('clientId');
+        if (userId) {
+          await socket
+            .emitWithAck('refresh-user', { userId })
+            .then((result: AuthResponcePayload) => {
+              if (result.status === 'success' && result._meta) {
+                const newUser = result._meta.user;
+                setUser(newUser);
+                localStorage.setItem('userId', newUser.id);
+                console.log('Agent refreshed');
+              } else {
+                toast.error(result.message);
+              }
+            })
+            .catch(() => console.log('Failed to refresh agent'));
+        }
+      }
     }
-  }, [user, chatId]);
+    checkoutUser();
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && chatId) {
+      socket
+        .emitWithAck('join-chat', { chatId, user })
+        .then((chat: TSupportChatPopulated) => {
+          setMessages((prev) => [
+            ...prev.filter((m) => m.type === 'system'),
+            ...chat.messages,
+          ]);
+        });
+    }
+  }, [isAuthenticated, chatId, user]);
 
   useEffect(() => {
     socket.on('message', (data) => {
@@ -85,15 +119,8 @@ export default function Home() {
       setMessages((prev) => [...prev, data]);
     });
 
-    socket.on('user_joined', (message) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          from: { username: '', type: 'client', socketId: socket?.id || '' },
-          type: 'system',
-          text: message,
-        },
-      ]);
+    socket.on('user_joined', (message: TSupportMessagePopulated) => {
+      setMessages((prev) => [...prev, message]);
     });
 
     socket.on('user_left', (message) => {
@@ -115,27 +142,33 @@ export default function Home() {
     };
   }, [user]);
 
-  const handleSendMessage = (messageText: string) => {
+  const handleSendMessage = async (messageText: string) => {
     if (user && chatId) {
-      const message = {
+      const messageBody = {
         type: 'user',
         text: messageText,
-        from: user,
-      } as TMessage;
-      socket.emit('message', { chatId, message });
+        senderId: user.id,
+        chatId,
+      };
+
+      const message = (await socket.emitWithAck(
+        'message',
+        messageBody
+      )) as TSupportMessagePopulated;
+
       setMessages((prev) => [...prev, message]);
     }
   };
 
   useEffect(() => {
     if (chatId) {
-      socket.emitWithAck('get-client-data', { chatId }).then((data: TUser) => {
-        setUser(data);
-      });
+      socket
+        .emitWithAck('get-client-data', { chatId })
+        .then((data: TSupportUser) => {
+          setUser(data);
+        });
     }
   }, [chatId]);
-
-  const isAuthenticated = user !== null;
 
   return (
     <div className='flex mt-24 justify-center w-full'>
@@ -148,10 +181,9 @@ export default function Home() {
                 <ChatMessage
                   key={index}
                   message={msg}
-                  isOwnMessage={
-                    user?.type === msg.from.type &&
-                    user?.username === msg.from.username
-                  }
+                  isOwnMessage={Boolean(
+                    user && msg.sender && user?.id === msg.sender?.id
+                  )}
                 />
               ))}
             </div>
@@ -164,11 +196,6 @@ export default function Home() {
         )
       ) : (
         <div>Loading...</div>
-        // <ClientLoginForm
-        //   onSuccess={(user) => {
-        //     setUser(user);
-        //   }}
-        // />
       )}
     </div>
   );

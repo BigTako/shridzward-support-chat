@@ -5,6 +5,7 @@ import ChatForm from '@/components/ChatForm';
 import ChatMessage from '@/components/ChatMessage';
 import { socket } from '@/lib/socketClient';
 import {
+  AuthResponcePayload,
   TChat,
   TSupportChatPopulated,
   TSupportChatShorting,
@@ -13,14 +14,6 @@ import {
 } from '@/lib/type';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-
-type AuthResponcePayload = {
-  status: 'success' | 'error';
-  message: string;
-  _meta?: {
-    user: TSupportUser;
-  };
-};
 
 function AgentLoginForm({
   onSuccess,
