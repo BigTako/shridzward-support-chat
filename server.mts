@@ -406,6 +406,16 @@ class SheetMessageStore {
           messages = messages.filter((m) => m.id === filter.id);
         }
       }
+      if (filter.chatId) {
+        if (typeof filter.chatId === 'object' && 'in' in filter.chatId) {
+          const inIds = filter?.chatId?.in as unknown as string[];
+          if (filter.chatId.in) {
+            messages = messages.filter((m) => inIds.includes(m.chatId));
+          }
+        } else {
+          messages = messages.filter((m) => m.chatId === filter.chatId);
+        }
+      }
     }
     return messages;
   }
@@ -551,6 +561,8 @@ class SheetJoinService {
       chatId: { in: chatIds },
     });
 
+    console.log({ messages: JSON.stringify(messages, undefined, 4) });
+
     const lastMessages = chats.map((chat) => {
       const chatMessages = messages.filter((m) => m.chatId === chat.id);
       return chatMessages[chatMessages.length - 1];
@@ -572,6 +584,10 @@ class SheetJoinService {
       };
     });
   }
+
+  // async getChatMessages(chatId: TSupportChat['id']) {
+  //   const messages = await this.messageStore.getMessages()
+  // }
 
   async getChatMessagesPopulated(chatId: TSupportChat['id']) {
     const messages = await this.messageStore.getMessages({ chatId });
@@ -771,18 +787,52 @@ class SheetUserStore {
   async updateUser(
     userId: TSupportUser['id'],
     data: Partial<Omit<TSupportUser, 'id' | 'createdAt'>>
-  ) {
-    const user = await this.getUser(userId);
+  ): Promise<TSupportUser | null> {
+    try {
+      // First get the user to see if it exists and get current data
+      const users = await this.getUsers();
+      const userIndex = users.findIndex((user) => user.id === userId);
 
-    if (!user) throw new Error('No user found');
+      if (userIndex === -1) {
+        return null; // User not found
+      }
 
-    const body = {
-      ...user,
-      ...data,
-    };
+      // The actual row in the spreadsheet (accounting for header row)
+      const rowIndex = userIndex + 2;
 
-    await this.removeUser(userId);
-    return await this.createUser(body);
+      // Merge current user data with update data
+      const currentUser = users[userIndex];
+      const updatedUser = {
+        ...currentUser,
+        ...data,
+      };
+
+      const { sheetApi } = await this.sheetRepo.getSpreadSheetApi();
+      const sheetName = 'Users';
+
+      // Update the specific row in the sheet
+      await sheetApi.spreadsheets.values.update({
+        spreadsheetId: getEnvVar('SPREADSHEET_ID'),
+        range: `${sheetName}!A${rowIndex}:E${rowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [
+            [
+              updatedUser.id,
+              updatedUser.username,
+              updatedUser.type,
+              updatedUser.socketId,
+              getFormattedTimestamp(),
+            ],
+          ],
+        },
+      });
+
+      return updatedUser;
+    } catch (error) {
+      console.log({ error });
+      return null;
+    }
   }
 }
 
@@ -839,7 +889,7 @@ app.prepare().then(async () => {
       return data;
     });
 
-  let agentUser = await sheetUserStore
+  const agentUser = await sheetUserStore
     .getOrCreate({
       username: getEnvVar('AGENT_LOGIN'),
       socketId: '0',
@@ -951,10 +1001,11 @@ app.prepare().then(async () => {
             lastMessage: populatedLastMessage,
           } as TSupportChatShorting;
 
-          if (agentIsLoggedIn()) {
-            if (agentUser) {
+          if (agentUser) {
+            const agent = await sheetUserStore.getUser(agentUser.id);
+            if (agent) {
               socket
-                .to(agentUser.socketId)
+                .to(agent.socketId)
                 .emit('new-client-chat', newChatShorting);
             }
           }
@@ -978,11 +1029,9 @@ app.prepare().then(async () => {
       'refresh-user',
       async ({ userId }: { userId: TSupportUser['id'] }, callback) => {
         try {
-          if (
-            agentUser &&
-            userId === agentUser.id &&
-            agentUser.socketId !== '0'
-          ) {
+          console.log(`Refresing user: ${userId}`);
+          const agent = await sheetUserStore.getUser(agentUser?.id || '');
+          if (agent && userId === agent.id && agent.socketId !== '0') {
             callback({
               status: 'error',
               message: 'Agent is already logged in',
@@ -1050,14 +1099,13 @@ app.prepare().then(async () => {
         try {
           console.log('login');
           const isAgent = type === 'agent';
-          if (!agentUser) throw new Error('No agent user');
 
-          agentUser = (await sheetUserStore.getUser(
-            agentUser.id
+          const currentAgent = (await sheetUserStore.getUser(
+            agentUser?.id || ''
           )) as TSupportUser;
 
-          if (isAgent) {
-            const alreadyLoggedIn = agentUser.socketId !== '0';
+          if (currentAgent && isAgent) {
+            const alreadyLoggedIn = currentAgent.socketId !== '0';
 
             if (alreadyLoggedIn) {
               return callback({
@@ -1078,15 +1126,18 @@ app.prepare().then(async () => {
             }
           }
 
-          agentUser = await sheetUserStore.updateUser(agentUser.id, {
-            socketId: socket.id,
-          });
+          const newAgent = await sheetUserStore.updateUser(
+            agentUser?.id || '',
+            {
+              socketId: socket.id,
+            }
+          );
 
           return callback({
             status: 'success',
             message: 'Login successful!',
             _meta: {
-              user: agentUser,
+              user: newAgent,
             },
           });
         } catch (e) {
@@ -1125,6 +1176,8 @@ app.prepare().then(async () => {
           const chatMessages = await sheetJoinService.getChatMessagesPopulated(
             chat.id
           );
+
+          console.log({ messages: JSON.stringify(chatMessages, undefined, 4) });
 
           const chatInfo = {
             ...chat,
@@ -1246,10 +1299,11 @@ app.prepare().then(async () => {
     );
 
     socket.on('disconnect', async () => {
+      console.log(`User is disconnected ${socket.id}`);
       const user = await sheetUserStore.getUserBySocketId(socket.id);
       if (user) {
         if (user.type === 'agent') {
-          agentUser = await sheetUserStore.updateUser(user.id, {
+          await sheetUserStore.updateUser(user.id, {
             socketId: '0',
           });
         } else {

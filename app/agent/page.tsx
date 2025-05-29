@@ -99,7 +99,7 @@ export default function AgentPage() {
     async function checkoutUser() {
       if (window) {
         const userId = localStorage.getItem('userId');
-        if (userId)
+        if (userId) {
           await socket
             .emitWithAck('refresh-user', { userId })
             .then((result: AuthResponcePayload) => {
@@ -114,101 +114,78 @@ export default function AgentPage() {
               }
             })
             .catch(() => console.log('Failed to refresh agent'));
-      } else {
-        setIsAuthenticated(false);
+        } else {
+          setIsAuthenticated(false);
+        }
       }
     }
     checkoutUser();
   }, []);
 
-  // useEffect(() => {
-  //   async function checkoutAgent() {
-  //     if (window) {
-  //       const userData = JSON.parse(localStorage.getItem('user') || 'null');
-  //       if (userData) {
-  //         await socket
-  //           .emitWithAck('refresh-agent', {})
-  //           .then((result: AuthResponcePayload) => {
-  //             if (result.status === 'success' && result._meta) {
-  //               const newUser = result._meta.user;
-  //               setIsAuthenticated(true);
-  //               setUser(newUser);
-  //               console.log('Agent refreshed');
-  //             } else {
-  //               console.log('Failed to refresh agent');
-  //             }
-  //           })
-  //           .catch(() => console.log('Failed to refresh agent'));
-  //       }
-  //     }
-  //   }
-  //   checkoutAgent();
-  // }, []);
+  useEffect(() => {
+    if (isAuthenticated) {
+      socket
+        .emitWithAck('get-chats', {})
+        .then((data: TSupportChatShorting[]) => {
+          console.log({ data });
+          setChats(data);
+        });
+    }
+  }, [isAuthenticated]);
 
-  // useEffect(() => {
-  //   if (isAuthenticated) {
-  //     socket
-  //       .emitWithAck('get-chats', {})
-  //       .then((data: TSupportChatShorting[]) => {
-  //         console.log({ data });
-  //         setChats(data);
-  //       });
-  //   }
-  // }, [isAuthenticated]);
+  useEffect(() => {
+    socket.on('new-client-chat', (data: TSupportChatShorting) => {
+      console.log('received chat from socket');
+      setChats((prev) => [data, ...prev]);
+    });
 
-  // useEffect(() => {
-  //   socket.on('new-client-chat', (data: TSupportChatShorting) => {
-  //     console.log('received chat from socket');
-  //     setChats((prev) => [data, ...prev]);
-  //   });
+    // socket.on('message', (data) => {
+    //   console.log(' received message from socket');
+    //   setMessages((prev) => [...prev, data]);
+    // });
 
-  //   // socket.on('message', (data) => {
-  //   //   console.log(' received message from socket');
-  //   //   setMessages((prev) => [...prev, data]);
-  //   // });
+    // socket.on('user_joined', (message) => {
+    //   setMessages((prev) => [
+    //     ...prev,
+    //     {
+    //       from: { username: '', type: 'client', socketId: socket?.id || '' },
+    //       type: 'system',
+    //       text: message,
+    //     },
+    //   ]);
+    // });
 
-  //   // socket.on('user_joined', (message) => {
-  //   //   setMessages((prev) => [
-  //   //     ...prev,
-  //   //     {
-  //   //       from: { username: '', type: 'client', socketId: socket?.id || '' },
-  //   //       type: 'system',
-  //   //       text: message,
-  //   //     },
-  //   //   ]);
-  //   // });
+    // socket.on('user_left', (message) => {
+    //   setMessages((prev) => [
+    //     ...prev,
+    //     {
+    //       from: { username: '', type: 'client', socketId: socket?.id || '' },
+    //       type: 'system',
+    //       text: message,
+    //     },
+    //   ]);
+    // });
 
-  //   // socket.on('user_left', (message) => {
-  //   //   setMessages((prev) => [
-  //   //     ...prev,
-  //   //     {
-  //   //       from: { username: '', type: 'client', socketId: socket?.id || '' },
-  //   //       type: 'system',
-  //   //       text: message,
-  //   //     },
-  //   //   ]);
-  //   // });
+    return () => {
+      socket.off('new-client-chat');
+      socket.off('message');
+      socket.off('user_joined');
+      socket.off('user_left');
+    };
+  }, []);
 
-  //   return () => {
-  //     socket.off('new-client-chat');
-  //     socket.off('message');
-  //     socket.off('user_joined');
-  //     socket.off('user_left');
-  //   };
-  // }, []);
-
-  // useEffect(() => {
-  //   if (isAuthenticated && chatId) {
-  //     socket
-  //       .emitWithAck('join-chat', { chatId, user })
-  //       .then((chat: TSupportChatPopulated) => {
-  //         setMessages((prev) => [
-  //           ...prev.filter((m) => m.type === 'system'),
-  //           ...chat.messages,
-  //         ]);
-  //       });
-  //   }
-  // }, [isAuthenticated, chatId, user]);
+  useEffect(() => {
+    if (isAuthenticated && chatId) {
+      socket
+        .emitWithAck('join-chat', { chatId, user })
+        .then((chat: TSupportChatPopulated) => {
+          setMessages((prev) => [
+            ...prev.filter((m) => m.type === 'system'),
+            ...chat.messages,
+          ]);
+        });
+    }
+  }, [isAuthenticated, chatId, user]);
 
   // const handleSendMessage = (messageText: string) => {
   //   if (user && chatId) {
