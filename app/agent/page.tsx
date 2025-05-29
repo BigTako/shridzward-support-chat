@@ -6,13 +6,10 @@ import ChatMessage from '@/components/ChatMessage';
 import { socket } from '@/lib/socketClient';
 import {
   TChat,
-  TMessage,
-  TSupportChat,
   TSupportChatPopulated,
   TSupportChatShorting,
   TSupportMessagePopulated,
   TSupportUser,
-  TUser,
 } from '@/lib/type';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -144,16 +141,9 @@ export default function AgentPage() {
       setMessages((prev) => [...prev, data]);
     });
 
-    // socket.on('user_joined', (message) => {
-    //   setMessages((prev) => [
-    //     ...prev,
-    //     {
-    //       from: { username: '', type: 'client', socketId: socket?.id || '' },
-    //       type: 'system',
-    //       text: message,
-    //     },
-    //   ]);
-    // });
+    socket.on('user_joined', (message: TSupportMessagePopulated) => {
+      setMessages((prev) => [...prev, message]);
+    });
 
     // socket.on('user_left', (message) => {
     //   setMessages((prev) => [

@@ -1163,16 +1163,31 @@ app.prepare().then(async () => {
     socket.on(
       'join-chat',
       async (
-        { chatId, user }: { chatId: TChat['id']; user: TSupportUser },
+        { chatId, user }: { chatId: TSupportChat['id']; user: TSupportUser },
         callback
       ) => {
         const chat = await sheetChatStore.getChat(chatId);
 
         if (chat) {
           socket.join(chatId);
-          socket
-            .to(chatId)
-            .emit('user_joined', `${user.username} joined room `);
+
+          const message = {
+            id: String(new Date().getTime()),
+            chatId,
+            senderId: 'system',
+            sender: {
+              id: 'system',
+              username: 'System',
+              socketId: '1',
+              type: 'client',
+              createdAt: new Date(),
+            },
+            text: `${user.username} joined room ${chatId}`,
+            type: 'system',
+            createdAt: new Date(),
+          } as TSupportMessagePopulated;
+
+          socket.to(chatId).emit('user_joined', message);
           console.log(`${user.username} joined room ${chatId}`);
 
           const isAgent = user.type === 'agent';
