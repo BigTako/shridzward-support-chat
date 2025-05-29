@@ -5,7 +5,6 @@ import {
   TChat,
   TChatShorting,
   TMessage,
-  TMessageType,
   TSupportChat,
   TSupportChatShorting,
   TSupportMessage,
@@ -13,7 +12,6 @@ import {
   TSupportUser,
   TUser,
   TUserInfo,
-  TUserType,
 } from './lib/type';
 import { google } from 'googleapis';
 import { randomUUID } from 'node:crypto';
@@ -255,6 +253,11 @@ class SheetChatStore {
     }
 
     return chats;
+  }
+
+  async getChat(chatId: TSupportChat['id']) {
+    const chats = await this.getChats();
+    return chats.find((c) => c.id === chatId);
   }
 
   async createChat(
@@ -570,6 +573,11 @@ class SheetJoinService {
     });
   }
 
+  async getChatMessagesPopulated(chatId: TSupportChat['id']) {
+    const messages = await this.messageStore.getMessages({ chatId });
+    return await this.populateMessages({ messages, fields: ['sender'] });
+  }
+
   // async populateChats({
   //   chats,
   //   fields,
@@ -628,6 +636,12 @@ class SheetUserStore {
   ) {
     const users = await this.getUsers();
     const user = users.find((u) => this.eq({ user1: u, user2: data }));
+    return user;
+  }
+
+  async getUserBySocketId(socketId: TSupportUser['socketId']) {
+    const users = await this.getUsers();
+    const user = users.find((user) => user.socketId === socketId);
     return user;
   }
 
@@ -739,6 +753,37 @@ class SheetUserStore {
       return false;
     }
   }
+
+  async removeUserBySocketId(
+    socketId: TSupportUser['socketId']
+  ): Promise<boolean> {
+    try {
+      // Get all chats to find the row index
+      const user = await this.getUserBySocketId(socketId);
+      if (!user) return false;
+      return await this.removeUser(user.id);
+    } catch (error) {
+      console.log({ error });
+      return false;
+    }
+  }
+
+  async updateUser(
+    userId: TSupportUser['id'],
+    data: Partial<Omit<TSupportUser, 'id' | 'createdAt'>>
+  ) {
+    const user = await this.getUser(userId);
+
+    if (!user) throw new Error('No user found');
+
+    const body = {
+      ...user,
+      ...data,
+    };
+
+    await this.removeUser(userId);
+    return await this.createUser(body);
+  }
 }
 
 app.prepare().then(async () => {
@@ -790,9 +835,24 @@ app.prepare().then(async () => {
       type: 'client',
     })
     .then((data) => {
-      console.log('[SUCCESS] ');
+      console.log('[SUCCESS] Claude is user is created successfuly');
       return data;
     });
+
+  let agentUser = await sheetUserStore
+    .getOrCreate({
+      username: getEnvVar('AGENT_LOGIN'),
+      socketId: '0',
+      type: 'agent',
+    })
+    .then((data) => {
+      console.log('[SUCCESS] Agent user is created successfuly');
+      return data;
+    });
+
+  function agentIsLoggedIn() {
+    return agentUser && agentUser.socketId !== '0';
+  }
 
   const chatStore = new ChatsStore();
   const userStore = new UserStore();
@@ -821,13 +881,8 @@ app.prepare().then(async () => {
           }
 
           const chatMembers = [client] as TSupportUser[];
-          const agent = await sheetUserStore.getUserByUsernameAndType({
-            username: getEnvVar('AGENT_LOGIN'),
-            type: 'agent',
-          });
-
-          if (agent) {
-            chatMembers.push(agent);
+          if (agentIsLoggedIn()) {
+            if (agentUser) chatMembers.push(agentUser);
           }
 
           // create chat (with members user and agent)
@@ -844,10 +899,8 @@ app.prepare().then(async () => {
             });
           }
 
-          // create messages (and attach them to chat via chat id)
           console.log('creating new chat');
 
-          // const chatId = String(new Date().getTime());
           let contextMessages = [];
 
           if (context) {
@@ -898,8 +951,12 @@ app.prepare().then(async () => {
             lastMessage: populatedLastMessage,
           } as TSupportChatShorting;
 
-          if (agent) {
-            socket.to(agent.socketId).emit('new-client-chat', newChatShorting);
+          if (agentIsLoggedIn()) {
+            if (agentUser) {
+              socket
+                .to(agentUser.socketId)
+                .emit('new-client-chat', newChatShorting);
+            }
           }
 
           callback({
@@ -917,48 +974,57 @@ app.prepare().then(async () => {
       }
     );
 
-    socket.on('refresh-agent', async ({}, callback) => {
-      try {
-        const agent = await sheetUserStore.getUserByUsernameAndType({
-          username: getEnvVar('AGENT_LOGIN'),
-          type: 'agent',
-        });
-        if (agent) {
-          await sheetUserStore.removeUser(agent.id);
-          await sheetUserStore.createUser({ ...agent, socketId: socket.id });
+    socket.on(
+      'refresh-user',
+      async ({ userId }: { userId: TSupportUser['id'] }, callback) => {
+        try {
+          if (
+            agentUser &&
+            userId === agentUser.id &&
+            agentUser.socketId !== '0'
+          ) {
+            callback({
+              status: 'error',
+              message: 'Agent is already logged in',
+            });
+          }
+
+          const user = await sheetUserStore.updateUser(userId, {
+            socketId: socket.id,
+          });
+
+          if (!user) {
+            throw new Error('Such user is not found');
+          }
+
+          callback({
+            status: 'success',
+            message: 'User refreshed',
+            _meta: {
+              user: user,
+            },
+          });
+        } catch (e) {
+          console.log({ e });
+          callback({
+            status: 'error',
+            message: 'Error refreshing user. Please review server logs.',
+          });
         }
-        // console.log('refresh-agent');
-        // const agent = userStore.getUsers().find((u) => u.type === 'agent') || {
-        //   username: process.env.AGENT_LOGIN,
-        //   type: 'agent',
-        // };
-        // const agentCopy = JSON.parse(
-        //   JSON.stringify({ ...agent, socketId: socket.id })
-        // );
-
-        // userStore.addUser(agentCopy); // upsert agent
-
-        callback({
-          status: 'success',
-          message: 'Agent refreshed',
-        });
-      } catch (e) {
-        console.log({ e });
-        callback({
-          status: 'error',
-          message: 'Error refreshing agent.Please review server logs.',
-        });
       }
-    });
+    );
 
     socket.on(
       'get-client-data',
-      ({ chatId }: { chatId: TChat['id'] }, callback) => {
+      async ({ chatId }: { chatId: TChat['id'] }, callback) => {
         try {
-          const chat = chatStore.getChat(chatId);
-          if (chat) {
-            const userData = chat.members.find((u) => u.type === 'client');
-            callback?.(userData);
+          const chat = await sheetChatStore.getChat(chatId);
+          const userId = chat?.members.find(
+            (memberId) => memberId !== agentUser?.id
+          );
+          if (chat && userId) {
+            const user = await sheetUserStore.getUser(userId);
+            callback?.(user);
           }
         } catch (e) {
           console.log({ e });
@@ -984,17 +1050,26 @@ app.prepare().then(async () => {
         try {
           console.log('login');
           const isAgent = type === 'agent';
+          if (!agentUser) throw new Error('No agent user');
+
+          agentUser = (await sheetUserStore.getUser(
+            agentUser.id
+          )) as TSupportUser;
+
           if (isAgent) {
-            const agent = userStore.getUser({ username, type });
-            if (agent) {
+            const alreadyLoggedIn = agentUser.socketId !== '0';
+
+            if (alreadyLoggedIn) {
               return callback({
                 status: 'error',
                 message: 'Agent is already logged in',
               });
             }
+
             const credsCorrect =
               username === agentCredentials.username &&
               password === agentCredentials.password;
+
             if (!credsCorrect) {
               return callback({
                 status: 'error',
@@ -1003,18 +1078,16 @@ app.prepare().then(async () => {
             }
           }
 
-          await sheetUserStore.createUser({
-            username,
-            type,
+          agentUser = await sheetUserStore.updateUser(agentUser.id, {
             socketId: socket.id,
           });
-
-          // const user = userStore.getUsers();
-          // console.log({ user });
 
           return callback({
             status: 'success',
             message: 'Login successful!',
+            _meta: {
+              user: agentUser,
+            },
           });
         } catch (e) {
           console.log({ e });
@@ -1034,29 +1107,31 @@ app.prepare().then(async () => {
 
     socket.on(
       'join-chat',
-      ({ chatId, user }: { chatId: TChat['id']; user: TUser }, callback) => {
-        const chat = chatStore.getChat(chatId);
+      async (
+        { chatId, user }: { chatId: TChat['id']; user: TSupportUser },
+        callback
+      ) => {
+        const chat = await sheetChatStore.getChat(chatId);
 
         if (chat) {
-          const isMember = chat.members.some(
-            (u) => u.type === user.type && u.username === user.username
-          );
-          if (!isMember) {
-            chat.members = [...chat.members, user];
-          }
           socket.join(chatId);
           socket
             .to(chatId)
             .emit('user_joined', `${user.username} joined room `);
           console.log(`${user.username} joined room ${chatId}`);
+
           const isAgent = user.type === 'agent';
+
+          const chatMessages = await sheetJoinService.getChatMessagesPopulated(
+            chat.id
+          );
 
           const chatInfo = {
             ...chat,
             messages: isAgent
-              ? chat.messages.filter((m) => m.type !== 'client-only')
-              : chat.messages.filter((m) => m.type !== 'agent-only'),
-          } as TChat;
+              ? chatMessages.filter((m) => m.type !== 'client-only')
+              : chatMessages.filter((m) => m.type !== 'agent-only'),
+          } as TSupportChat;
 
           callback?.(chatInfo);
         }
@@ -1103,10 +1178,6 @@ app.prepare().then(async () => {
     socket.on('get-users', (_, callback) => {
       const users = userStore.getUsers();
       callback(users);
-      // const { from, text } = message;
-      // console.log(`Message from ${from.username} in room ${chatId}: ${text}`);
-      // socket.to(chatId).emit('message', message);
-      // chatStore.sendMessage(chatId, message);
     });
 
     socket.on(
@@ -1174,8 +1245,25 @@ app.prepare().then(async () => {
       }
     );
 
-    socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.id}`);
+    socket.on('disconnect', async () => {
+      const user = await sheetUserStore.getUserBySocketId(socket.id);
+      if (user) {
+        if (user.type === 'agent') {
+          agentUser = await sheetUserStore.updateUser(user.id, {
+            socketId: '0',
+          });
+        } else {
+          await sheetUserStore.updateUser(user.id, {
+            socketId: '0',
+          });
+        }
+      }
+      // await sheetUserStore.removeUserBySocketId(socket.id).then((isSuccess) => {
+      //   if (isSuccess) {
+      //   } else {
+      //     console.log(`Failed to disconnect and removed: ${socket.id}`);
+      //   }
+      // });
     });
   });
 

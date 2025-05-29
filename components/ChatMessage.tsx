@@ -1,13 +1,13 @@
-import { TMessage } from '@/lib/type';
+import { TSupportMessagePopulated } from '@/lib/type';
 import { useMemo } from 'react';
 
 interface ChatMessageProps {
-  message: TMessage;
+  message: TSupportMessagePopulated;
   isOwnMessage: boolean;
 }
 
 const ChatMessage = ({ message, isOwnMessage }: ChatMessageProps) => {
-  const { from, type, text } = message;
+  const { sender, type, text } = message;
 
   const isSystemMessage = type === 'system';
   const messageStyleMap = useMemo(
@@ -42,7 +42,7 @@ const ChatMessage = ({ message, isOwnMessage }: ChatMessageProps) => {
         className={`max-w-xs px-4 py-2 rounded-lg ${messageStyleMap[messageType]}`}
       >
         {!isSystemMessage && (
-          <p className='text-sm font-bold'>{from.username}</p>
+          <p className='text-sm font-bold'>{sender?.username}</p>
         )}
         <p>{text}</p>
       </div>

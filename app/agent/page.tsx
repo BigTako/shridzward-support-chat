@@ -6,35 +6,40 @@ import ChatMessage from '@/components/ChatMessage';
 import { socket } from '@/lib/socketClient';
 import {
   TChat,
-  TChatShorting,
   TMessage,
+  TSupportChat,
+  TSupportChatPopulated,
   TSupportChatShorting,
+  TSupportMessagePopulated,
+  TSupportUser,
   TUser,
 } from '@/lib/type';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 
+type AuthResponcePayload = {
+  status: 'success' | 'error';
+  message: string;
+  _meta?: {
+    user: TSupportUser;
+  };
+};
+
 function AgentLoginForm({
   onSuccess,
 }: {
-  onSuccess: (user: Omit<TUser, 'socketId'>) => void;
+  onSuccess: (user: TSupportUser) => void;
 }) {
   const handleLogin = async (username: string, password: string) => {
     const result = (await socket.emitWithAck('login', {
       username,
       type: 'agent',
       password,
-    })) as {
-      status: 'success' | 'error';
-      message: string;
-    };
+    })) as AuthResponcePayload;
 
     if (result) {
-      if (result.status === 'success') {
-        onSuccess({
-          username,
-          type: 'agent',
-        });
+      if (result.status === 'success' && result._meta) {
+        onSuccess(result._meta.user);
         toast.success(result.message);
       } else {
         toast.error(result.message);
@@ -86,85 +91,122 @@ export default function AgentPage() {
 
   const [chats, setChats] = useState<TSupportChatShorting[]>([]);
 
-  const [user, setUser] = useState<TUser | null>(null);
+  const [user, setUser] = useState<TSupportUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [messages, setMessages] = useState<TMessage[]>([]);
+  const [messages, setMessages] = useState<TSupportMessagePopulated[]>([]);
 
   useEffect(() => {
-    async function checkoutAgent() {
+    async function checkoutUser() {
       if (window) {
-        const userData = JSON.parse(localStorage.getItem('user') || 'null');
-        setIsAuthenticated(userData !== null);
-        setUser(userData);
-        await socket
-          .emitWithAck('refresh-agent', {})
-          .then(() => console.log('Agent refreshed'))
-          .catch(() => console.log('Failed to refresh agent'));
+        const userId = localStorage.getItem('userId');
+        if (userId)
+          await socket
+            .emitWithAck('refresh-user', { userId })
+            .then((result: AuthResponcePayload) => {
+              if (result.status === 'success' && result._meta) {
+                const newUser = result._meta.user;
+                setIsAuthenticated(true);
+                setUser(newUser);
+                localStorage.setItem('userId', newUser.id);
+                console.log('Agent refreshed');
+              } else {
+                toast.error(result.message);
+              }
+            })
+            .catch(() => console.log('Failed to refresh agent'));
+      } else {
+        setIsAuthenticated(false);
       }
     }
-    checkoutAgent();
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      socket
-        .emitWithAck('get-chats', {})
-        .then((data: TSupportChatShorting[]) => {
-          console.log({ data });
-          setChats(data);
-        });
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    socket.on('new-client-chat', (data: TSupportChatShorting) => {
-      console.log('received chat from socket');
-      setChats((prev) => [data, ...prev]);
-    });
-
-    // socket.on('message', (data) => {
-    //   console.log(' received message from socket');
-    //   setMessages((prev) => [...prev, data]);
-    // });
-
-    // socket.on('user_joined', (message) => {
-    //   setMessages((prev) => [
-    //     ...prev,
-    //     {
-    //       from: { username: '', type: 'client', socketId: socket?.id || '' },
-    //       type: 'system',
-    //       text: message,
-    //     },
-    //   ]);
-    // });
-
-    // socket.on('user_left', (message) => {
-    //   setMessages((prev) => [
-    //     ...prev,
-    //     {
-    //       from: { username: '', type: 'client', socketId: socket?.id || '' },
-    //       type: 'system',
-    //       text: message,
-    //     },
-    //   ]);
-    // });
-
-    return () => {
-      socket.off('new-client-chat');
-      socket.off('message');
-      socket.off('user_joined');
-      socket.off('user_left');
-    };
+    checkoutUser();
   }, []);
 
   // useEffect(() => {
+  //   async function checkoutAgent() {
+  //     if (window) {
+  //       const userData = JSON.parse(localStorage.getItem('user') || 'null');
+  //       if (userData) {
+  //         await socket
+  //           .emitWithAck('refresh-agent', {})
+  //           .then((result: AuthResponcePayload) => {
+  //             if (result.status === 'success' && result._meta) {
+  //               const newUser = result._meta.user;
+  //               setIsAuthenticated(true);
+  //               setUser(newUser);
+  //               console.log('Agent refreshed');
+  //             } else {
+  //               console.log('Failed to refresh agent');
+  //             }
+  //           })
+  //           .catch(() => console.log('Failed to refresh agent'));
+  //       }
+  //     }
+  //   }
+  //   checkoutAgent();
+  // }, []);
+
+  // useEffect(() => {
+  //   if (isAuthenticated) {
+  //     socket
+  //       .emitWithAck('get-chats', {})
+  //       .then((data: TSupportChatShorting[]) => {
+  //         console.log({ data });
+  //         setChats(data);
+  //       });
+  //   }
+  // }, [isAuthenticated]);
+
+  // useEffect(() => {
+  //   socket.on('new-client-chat', (data: TSupportChatShorting) => {
+  //     console.log('received chat from socket');
+  //     setChats((prev) => [data, ...prev]);
+  //   });
+
+  //   // socket.on('message', (data) => {
+  //   //   console.log(' received message from socket');
+  //   //   setMessages((prev) => [...prev, data]);
+  //   // });
+
+  //   // socket.on('user_joined', (message) => {
+  //   //   setMessages((prev) => [
+  //   //     ...prev,
+  //   //     {
+  //   //       from: { username: '', type: 'client', socketId: socket?.id || '' },
+  //   //       type: 'system',
+  //   //       text: message,
+  //   //     },
+  //   //   ]);
+  //   // });
+
+  //   // socket.on('user_left', (message) => {
+  //   //   setMessages((prev) => [
+  //   //     ...prev,
+  //   //     {
+  //   //       from: { username: '', type: 'client', socketId: socket?.id || '' },
+  //   //       type: 'system',
+  //   //       text: message,
+  //   //     },
+  //   //   ]);
+  //   // });
+
+  //   return () => {
+  //     socket.off('new-client-chat');
+  //     socket.off('message');
+  //     socket.off('user_joined');
+  //     socket.off('user_left');
+  //   };
+  // }, []);
+
+  // useEffect(() => {
   //   if (isAuthenticated && chatId) {
-  //     socket.emitWithAck('join-chat', { chatId, user }).then((chat: TChat) => {
-  //       setMessages((prev) => [
-  //         ...prev.filter((m) => m.type === 'system'),
-  //         ...chat.messages,
-  //       ]);
-  //     });
+  //     socket
+  //       .emitWithAck('join-chat', { chatId, user })
+  //       .then((chat: TSupportChatPopulated) => {
+  //         setMessages((prev) => [
+  //           ...prev.filter((m) => m.type === 'system'),
+  //           ...chat.messages,
+  //         ]);
+  //       });
   //   }
   // }, [isAuthenticated, chatId, user]);
 
@@ -227,7 +269,11 @@ export default function AgentPage() {
             </button>
           </div>
         )}
-        {isAuthenticated ? (
+        {isAuthenticated === null ? (
+          <div className='w-full h-full justify-center items-center'>
+            Loading...
+          </div>
+        ) : isAuthenticated ? (
           <div className='flex gap-3'>
             <div className='flex flex-col gap-4 w-[500px] mt-10 text-center p-2'>
               {chats && chats.length > 0 ? (
@@ -253,10 +299,9 @@ export default function AgentPage() {
                       <ChatMessage
                         key={index}
                         message={msg}
-                        isOwnMessage={
-                          user?.type === msg.from.type &&
-                          user?.username === msg.from.username
-                        }
+                        isOwnMessage={Boolean(
+                          user && msg.sender && user?.id === msg.sender?.id
+                        )}
                       />
                     ))}
                   </div>
@@ -275,7 +320,7 @@ export default function AgentPage() {
               setUser({ ...user, socketId: socket?.id || '' });
               setIsAuthenticated(true);
               if (window) {
-                localStorage.setItem('user', JSON.stringify(user));
+                localStorage.setItem('userId', user.id);
               }
             }}
           />

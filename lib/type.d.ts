@@ -35,6 +35,11 @@ type TSupportChat = {
   createdAt: Date;
 };
 
+type TSupportChatPopulated = Omit<TSupportChat, 'members'> & {
+  members: TSupportUser[];
+  messages: TSupportMessagePopulated[];
+};
+
 export type TSupportChatPopulated = Omit<TSupportChat, 'members'> & {
   members?: TSupportUser;
   messages?: TSupportMessage[];
