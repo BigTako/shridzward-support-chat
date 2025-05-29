@@ -139,10 +139,10 @@ export default function AgentPage() {
       setChats((prev) => [data, ...prev]);
     });
 
-    // socket.on('message', (data) => {
-    //   console.log(' received message from socket');
-    //   setMessages((prev) => [...prev, data]);
-    // });
+    socket.on('message', (data) => {
+      console.log(' received message from socket');
+      setMessages((prev) => [...prev, data]);
+    });
 
     // socket.on('user_joined', (message) => {
     //   setMessages((prev) => [
@@ -187,17 +187,23 @@ export default function AgentPage() {
     }
   }, [isAuthenticated, chatId, user]);
 
-  // const handleSendMessage = (messageText: string) => {
-  //   if (user && chatId) {
-  //     const message = {
-  //       type: 'user',
-  //       text: messageText,
-  //       from: user,
-  //     } as TMessage;
-  //     socket.emit('message', { chatId, message });
-  //     setMessages((prev) => [...prev, message]);
-  //   }
-  // };
+  const handleSendMessage = async (messageText: string) => {
+    if (user && chatId) {
+      const messageBody = {
+        type: 'user',
+        text: messageText,
+        senderId: user.id,
+        chatId,
+      };
+
+      const message = (await socket.emitWithAck(
+        'message',
+        messageBody
+      )) as TSupportMessagePopulated;
+
+      setMessages((prev) => [...prev, message]);
+    }
+  };
 
   const handleLogout = () => {
     if (window) {
@@ -226,10 +232,6 @@ export default function AgentPage() {
           localStorage.removeItem('user');
         });
     }
-  };
-
-  const handleSendMessage = (message: string) => {
-    console.log({ message });
   };
   // if (!isAuthenticated || !user) return null;
 

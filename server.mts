@@ -594,13 +594,17 @@ class SheetJoinService {
     return await this.populateMessages({ messages, fields: ['sender'] });
   }
 
-  // async populateChats({
-  //   chats,
-  //   fields,
-  // }: {
-  //   chats: TSupportChat[];
-  //   fields: ('members' | 'messages')[];
-  // }) {}
+  async sendMessage(body: Omit<TSupportMessage, 'id' | 'createdAt'>) {
+    const message = await this.messageStore.createMessage(body);
+    if (message) {
+      const [populatedMessage] = await this.populateMessages({
+        messages: [message],
+        fields: ['sender'],
+      });
+      return populatedMessage;
+    }
+    return null;
+  }
 }
 
 class SheetUserStore {
@@ -955,7 +959,7 @@ app.prepare().then(async () => {
 
           if (context) {
             contextMessages.push({
-              from: claudeUser.id,
+              senderId: claudeUser.id,
               chatId: chat.id,
               type: 'agent-only',
               text: `Context: ${context}`,
@@ -1193,11 +1197,22 @@ app.prepare().then(async () => {
 
     socket.on(
       'message',
-      ({ chatId, message }: { chatId: TChat['id']; message: TMessage }) => {
-        const { from, text } = message;
-        console.log(`Message from ${from.username} in room ${chatId}: ${text}`);
-        socket.to(chatId).emit('message', message);
-        chatStore.sendMessage(chatId, message);
+      async (
+        body: {
+          chatId: TSupportChat['id'];
+          type: TSupportMessage['type'];
+          text: string;
+          senderId: TSupportMessage['senderId'];
+        },
+        callback
+      ) => {
+        console.log(
+          `Message from ${body.senderId} in room ${body.chatId}: ${body.text}`
+        );
+        const message = await sheetJoinService.sendMessage(body);
+        socket.to(body.chatId).emit('message', message);
+        callback?.(message);
+        // chatStore.sendMessage(chatId, message);
       }
     );
 
