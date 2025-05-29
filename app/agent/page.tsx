@@ -118,10 +118,10 @@ export default function AgentPage() {
   };
 
   const handleLogout = () => {
-    if (window) {
+    if (window && user) {
       socket
         .emitWithAck('logout', {
-          user,
+          userId: user.id,
         })
         .then(
           ({

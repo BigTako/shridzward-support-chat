@@ -219,7 +219,10 @@ class SheetChatStore {
   private static dataRange = 'A:E';
   constructor(private sheetRepo: GoogleSheetsRepository) {}
 
-  async getChats(filter?: { id?: { in?: string[] } }): Promise<TSupportChat[]> {
+  async getChats(filter?: {
+    id?: { in?: string[] };
+    members?: { includes: string };
+  }): Promise<TSupportChat[]> {
     function rowsToObjects(rows: string[][]) {
       return rows.map((row) => {
         const [id, members, userQuestion, context, createdAt] = row;
@@ -246,10 +249,15 @@ class SheetChatStore {
 
     rows.data.values?.shift();
 
-    let chats = rowsToObjects(rows.data.values || []);
+    let chats = rowsToObjects(rows.data.values || []) as TSupportChat[];
 
     if (filter?.id?.in) {
       chats = chats.filter((c) => filter.id?.in?.includes(c.id));
+    }
+
+    if (filter?.members?.includes) {
+      const memberId = filter.members.includes;
+      chats = chats.filter((c) => c.members.includes(memberId));
     }
 
     return chats;
@@ -1231,92 +1239,42 @@ app.prepare().then(async () => {
       }
     );
 
-    socket.on('logout', ({ user }: { user: TUser }, callback) => {
-      try {
-        console.log(`Logout user`);
-        userStore.removeUser(user);
-        const socketRooms = chatStore
-          .getChats()
-          .filter((chat) =>
-            chat.messages.some((m) => m.from.socketId === socket.id)
-          );
-        socketRooms.forEach((room) => {
-          socket.to(room.id).emit('user_left', `${user.username} left`);
-          socket.leave(room.id);
-        });
-        return callback({
-          status: 'success',
-          message: 'Logout successful!',
-        });
-      } catch (e) {
-        console.log(e);
-        return callback({
-          status: 'success',
-          message: 'Error during logout.Please review server logs.',
-        });
-      }
-    });
-
-    // admin
-    socket.on('get-users', (_, callback) => {
-      const users = userStore.getUsers();
-      callback(users);
-    });
-
     socket.on(
-      'delete-user',
-      ({ user }: { user: Omit<TUser, 'socketId'> }, callback) => {
+      'logout',
+      async ({ userId }: { userId: TSupportUser['id'] }, callback) => {
         try {
+          const user = await sheetUserStore.getUser(userId);
+
+          if (!user) throw new Error('User not found');
+
+          const chats = await sheetChatStore.getChats({
+            members: { includes: userId },
+          });
           console.log(`Logout user`);
-          userStore.removeUser(user);
-          const socketRooms = chatStore
-            .getChats()
-            .filter((chat) =>
-              chat.messages.some((m) => m.from.socketId === socket.id)
-            );
-          socketRooms.forEach((room) => {
-            socket.to(room.id).emit('user_left', `${user.username} left`);
+
+          chats.forEach((room) => {
+            socket.to(room.id).emit('user_left', `${user?.username} left`);
             socket.leave(room.id);
           });
-          userStore.removeUser(user);
+
+          let isRemovalSuccessful: boolean;
+
+          if (user?.type === 'agent') {
+            isRemovalSuccessful = Boolean(
+              await sheetUserStore.updateUser(userId, { socketId: '0' })
+            );
+          } else {
+            isRemovalSuccessful = Boolean(
+              await sheetUserStore.removeUser(userId)
+            );
+          }
+
+          if (!isRemovalSuccessful)
+            throw new Error('User to remove is not found');
+
           return callback({
             status: 'success',
             message: 'Logout successful!',
-          });
-        } catch (e) {
-          console.log(e);
-          return callback({
-            status: 'success',
-            message: 'Error during logout.Please review server logs.',
-          });
-        }
-      }
-    );
-
-    socket.on(
-      'delete-chat',
-      ({ chatId }: { chatId: TChat['id'] }, callback) => {
-        try {
-          const chat = chatStore.getChat(chatId);
-          const users = chat?.messages.reduce((acc, cur) => {
-            const user = cur.from;
-            const alreadyIn = acc.some(
-              (u) => u.type === user.type && u.username === user.username
-            );
-            if (!alreadyIn) {
-              acc.push(user);
-            }
-            return acc;
-          }, [] as TUser[]);
-
-          users?.forEach((user) => {
-            socket.to(user.socketId).emit('leave-chat', { chatId });
-          });
-
-          chatStore.removeChat(chatId);
-          return callback({
-            status: 'success',
-            message: 'Chat deleted successfuly',
           });
         } catch (e) {
           console.log(e);
