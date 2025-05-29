@@ -1,9 +1,9 @@
 'use client';
-import { TSupportChatShorting } from '@/lib/type';
+import { TChatShorting } from '@/lib/type';
 import Image from 'next/image';
 
 type Props = {
-  chat: TSupportChatShorting;
+  chat: TChatShorting;
   onNameClick: () => void;
 };
 

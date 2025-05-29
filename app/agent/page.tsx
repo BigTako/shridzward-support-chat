@@ -6,24 +6,23 @@ import ChatMessage from '@/components/ChatMessage';
 import { socket } from '@/lib/socketClient';
 import {
   AuthResponcePayload,
-  TChat,
-  TSupportChatPopulated,
-  TSupportChatShorting,
-  TSupportMessagePopulated,
-  TSupportUser,
+  TChatPopulated,
+  TChatShorting,
+  TMessagePopulated,
+  TUser,
 } from '@/lib/type';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { AgentLoginForm } from './_components/AgentLoginForm';
 
 export default function AgentPage() {
-  const [chatId, setChatId] = useState<TChat['id'] | null>(null);
+  const [chatId, setChatId] = useState<TChatShorting['id'] | null>(null);
 
-  const [chats, setChats] = useState<TSupportChatShorting[]>([]);
+  const [chats, setChats] = useState<TChatShorting[]>([]);
 
-  const [user, setUser] = useState<TSupportUser | null>(null);
+  const [user, setUser] = useState<TUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [messages, setMessages] = useState<TSupportMessagePopulated[]>([]);
+  const [messages, setMessages] = useState<TMessagePopulated[]>([]);
 
   useEffect(() => {
     async function checkoutUser() {
@@ -54,17 +53,15 @@ export default function AgentPage() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      socket
-        .emitWithAck('get-chats', {})
-        .then((data: TSupportChatShorting[]) => {
-          console.log({ data });
-          setChats(data);
-        });
+      socket.emitWithAck('get-chats', {}).then((data: TChatShorting[]) => {
+        console.log({ data });
+        setChats(data);
+      });
     }
   }, [isAuthenticated]);
 
   useEffect(() => {
-    socket.on('new-client-chat', (data: TSupportChatShorting) => {
+    socket.on('new-client-chat', (data: TChatShorting) => {
       console.log('received chat from socket');
       setChats((prev) => [data, ...prev]);
     });
@@ -74,7 +71,7 @@ export default function AgentPage() {
       setMessages((prev) => [...prev, data]);
     });
 
-    socket.on('user_joined', (message: TSupportMessagePopulated) => {
+    socket.on('user_joined', (message: TMessagePopulated) => {
       setMessages((prev) => [...prev, message]);
     });
 
@@ -90,7 +87,7 @@ export default function AgentPage() {
     if (isAuthenticated && chatId) {
       socket
         .emitWithAck('join-chat', { chatId, user })
-        .then((chat: TSupportChatPopulated) => {
+        .then((chat: TChatPopulated) => {
           setMessages((prev) => [
             ...prev.filter((m) => m.type === 'system'),
             ...chat.messages,
@@ -111,7 +108,7 @@ export default function AgentPage() {
       const message = (await socket.emitWithAck(
         'message',
         messageBody
-      )) as TSupportMessagePopulated;
+      )) as TMessagePopulated;
 
       setMessages((prev) => [...prev, message]);
     }

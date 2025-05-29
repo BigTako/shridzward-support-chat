@@ -12,50 +12,22 @@ type TMessageType = 'user' | 'system' | 'agent-only' | 'client-only';
 
 type TUserType = 'client' | 'agent';
 
-type TUser = {
-  username: string;
-  socketId: string;
-  type: TUserType;
-};
-
 type TUserInfo = Pick<TUser, 'username' | 'type'>;
-
-type TMessage = {
-  from: TUser;
-  type: TMessageType;
-  text: string;
-};
 
 type TChat = {
   id: string;
-  createdAt: Date;
-  members: TUser[];
-  messages: TMessage[];
-};
-
-export type TChatShorting = Pick<TChat, 'id' | 'createdAt'> & {
-  lastMessage: TMessage;
-};
-
-type TSupportChat = {
-  id: string;
-  members: TSupportUser['id'][];
+  members: TUser['id'][];
   userQuestion: string;
   context?: string;
   createdAt: Date;
 };
 
-type TSupportChatPopulated = Omit<TSupportChat, 'members'> & {
-  members: TSupportUser[];
-  messages: TSupportMessagePopulated[];
+type TChatPopulated = Omit<TChat, 'members'> & {
+  members: TUser[];
+  messages: TMessagePopulated[];
 };
 
-export type TSupportChatPopulated = Omit<TSupportChat, 'members'> & {
-  members?: TSupportUser;
-  messages?: TSupportMessage[];
-};
-
-export type TSupportUser = {
+export type TUser = {
   id: string;
   username: string;
   socketId: string;
@@ -63,28 +35,28 @@ export type TSupportUser = {
   createdAt: Date;
 };
 
-export type TSupportMessage = {
+export type TMessage = {
   id: string;
-  chatId: TSupportChat['id'];
-  senderId: TSupportUser['id'];
+  chatId: TChat['id'];
+  senderId: TUser['id'];
   type: TMessageType;
   text: string;
   createdAt: Date;
 };
 
-export type TSupportMessagePopulated = TSupportMessage & {
-  sender?: TSupportUser;
-  chat?: TSupportChat;
+export type TMessagePopulated = TMessage & {
+  sender?: TUser;
+  chat?: TChat;
 };
 
-export type TSupportChatShorting = Pick<TSupportChat, 'id' | 'createdAt'> & {
-  lastMessage: TSupportMessagePopulated;
+export type TChatShorting = Pick<TChat, 'id' | 'createdAt'> & {
+  lastMessage: TMessagePopulated;
 };
 
 export type AuthResponcePayload = {
   status: 'success' | 'error';
   message: string;
   _meta?: {
-    user: TSupportUser;
+    user: TUser;
   };
 };

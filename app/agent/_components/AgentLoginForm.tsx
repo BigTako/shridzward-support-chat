@@ -1,14 +1,14 @@
 'use client';
 
 import { socket } from '@/lib/socketClient';
-import { AuthResponcePayload, TSupportUser } from '@/lib/type';
+import { AuthResponcePayload, TUser } from '@/lib/type';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 
 export function AgentLoginForm({
   onSuccess,
 }: {
-  onSuccess: (user: TSupportUser) => void;
+  onSuccess: (user: TUser) => void;
 }) {
   const handleLogin = async (username: string, password: string) => {
     const result = (await socket.emitWithAck('login', {

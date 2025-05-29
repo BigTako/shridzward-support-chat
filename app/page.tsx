@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   AuthResponcePayload,
-  TSupportChatPopulated,
-  TSupportMessagePopulated,
-  TSupportUser,
+  TChatPopulated,
+  TMessagePopulated,
+  TUser,
 } from '@/lib/type';
 import ChatMessage from '@/components/ChatMessage';
 import ChatForm from '@/components/ChatForm';
@@ -17,9 +17,9 @@ export default function Home() {
 
   const chatId = searchParams.get('chat');
 
-  const [messages, setMessages] = useState<TSupportMessagePopulated[]>([]);
+  const [messages, setMessages] = useState<TMessagePopulated[]>([]);
 
-  const [user, setUser] = useState<TSupportUser | null>(null);
+  const [user, setUser] = useState<TUser | null>(null);
 
   const isAuthenticated = user !== null;
 
@@ -51,7 +51,7 @@ export default function Home() {
     if (isAuthenticated && chatId) {
       socket
         .emitWithAck('join-chat', { chatId, user })
-        .then((chat: TSupportChatPopulated) => {
+        .then((chat: TChatPopulated) => {
           setMessages((prev) => [
             ...prev.filter((m) => m.type === 'system'),
             ...chat.messages,
@@ -66,7 +66,7 @@ export default function Home() {
       setMessages((prev) => [...prev, data]);
     });
 
-    socket.on('user_joined', (message: TSupportMessagePopulated) => {
+    socket.on('user_joined', (message: TMessagePopulated) => {
       setMessages((prev) => [...prev, message]);
     });
 
@@ -89,7 +89,7 @@ export default function Home() {
       const message = (await socket.emitWithAck(
         'message',
         messageBody
-      )) as TSupportMessagePopulated;
+      )) as TMessagePopulated;
 
       setMessages((prev) => [...prev, message]);
     }
@@ -97,11 +97,9 @@ export default function Home() {
 
   useEffect(() => {
     if (chatId) {
-      socket
-        .emitWithAck('get-client-data', { chatId })
-        .then((data: TSupportUser) => {
-          setUser(data);
-        });
+      socket.emitWithAck('get-client-data', { chatId }).then((data: TUser) => {
+        setUser(data);
+      });
     }
   }, [chatId]);
 

@@ -4,11 +4,10 @@ import { Server } from 'socket.io';
 import {
   EnvVars,
   TChat,
-  TSupportChat,
-  TSupportChatShorting,
-  TSupportMessage,
-  TSupportMessagePopulated,
-  TSupportUser,
+  TChatShorting,
+  TMessage,
+  TMessagePopulated,
+  TUser,
   TUserInfo,
 } from './lib/type';
 import { google } from 'googleapis';
@@ -113,7 +112,7 @@ class ChatStore {
   async getChats(filter?: {
     id?: { in?: string[] };
     members?: { includes: string };
-  }): Promise<TSupportChat[]> {
+  }): Promise<TChat[]> {
     function rowsToObjects(rows: string[][]) {
       return rows.map((row) => {
         const [id, members, userQuestion, context, createdAt] = row;
@@ -140,7 +139,7 @@ class ChatStore {
 
     rows.data.values?.shift();
 
-    let chats = rowsToObjects(rows.data.values || []) as TSupportChat[];
+    let chats = rowsToObjects(rows.data.values || []) as TChat[];
 
     if (filter?.id?.in) {
       chats = chats.filter((c) => filter.id?.in?.includes(c.id));
@@ -154,18 +153,16 @@ class ChatStore {
     return chats;
   }
 
-  async getChat(chatId: TSupportChat['id']) {
+  async getChat(chatId: TChat['id']) {
     const chats = await this.getChats();
     return chats.find((c) => c.id === chatId);
   }
 
   async createChat(
-    data: Omit<TSupportChat, 'id' | 'createdAt'>
-  ): Promise<TSupportChat | null> {
+    data: Omit<TChat, 'id' | 'createdAt'>
+  ): Promise<TChat | null> {
     try {
-      function objToRow(
-        obj: Omit<TSupportChat, 'createdAt'> & { createdAt: string }
-      ) {
+      function objToRow(obj: Omit<TChat, 'createdAt'> & { createdAt: string }) {
         const { id, members, userQuestion, context, createdAt } = obj;
         return [id, JSON.stringify(members), userQuestion, context, createdAt];
       }
@@ -261,13 +258,13 @@ class MessageStore {
   constructor(private sheetRepo: GoogleSheetsRepository) {}
 
   async getMessages(filter?: {
-    id?: { in?: TSupportMessage['id'][] } | TSupportMessage['id'];
+    id?: { in?: TMessage['id'][] } | TMessage['id'];
     chatId?:
       | {
-          in?: TSupportMessage['chatId'][];
+          in?: TMessage['chatId'][];
         }
-      | TSupportChat['id'];
-  }): Promise<TSupportMessage[]> {
+      | TChat['id'];
+  }): Promise<TMessage[]> {
     function toObjects(rows: string[][]) {
       return rows.map((row) => {
         const [id, chatId, senderId, type, text, createdAt] = row;
@@ -292,7 +289,7 @@ class MessageStore {
       range,
     });
     rows.data.values?.shift(); // remove header
-    let messages = toObjects(rows.data.values || []) as TSupportMessage[];
+    let messages = toObjects(rows.data.values || []) as TMessage[];
 
     if (filter) {
       if (filter.id) {
@@ -320,11 +317,11 @@ class MessageStore {
   }
 
   async createMessage(
-    data: Omit<TSupportMessage, 'id' | 'createdAt'>
-  ): Promise<TSupportMessage | null> {
+    data: Omit<TMessage, 'id' | 'createdAt'>
+  ): Promise<TMessage | null> {
     try {
       function objToRow(
-        obj: Omit<TSupportMessage, 'createdAt'> & { createdAt: string }
+        obj: Omit<TMessage, 'createdAt'> & { createdAt: string }
       ) {
         const { id, chatId, senderId, type, text, createdAt } = obj;
         return [id, chatId, senderId, type, text, createdAt];
@@ -357,7 +354,7 @@ class MessageStore {
     }
   }
 
-  async removeMessage(messageId: TSupportMessage['id']): Promise<boolean> {
+  async removeMessage(messageId: TMessage['id']): Promise<boolean> {
     try {
       // Get all chats to find the row index
       const messages = await this.getMessages();
@@ -410,7 +407,7 @@ class MessageStore {
 class UserStore {
   constructor(private sheetRepo: GoogleSheetsRepository) {}
 
-  async getUsers(filter?: { id?: { in?: string[] } }): Promise<TSupportUser[]> {
+  async getUsers(filter?: { id?: { in?: string[] } }): Promise<TUser[]> {
     function toObjects(rows: string[][]) {
       return rows.map((row) => {
         const [id, username, type, socketId, createdAt] = row;
@@ -437,7 +434,7 @@ class UserStore {
 
     rows.data.values?.shift();
 
-    let users = toObjects(rows.data.values || []) as TSupportUser[];
+    let users = toObjects(rows.data.values || []) as TUser[];
 
     if (filter?.id?.in) {
       users = users.filter((u) => filter.id?.in?.includes(u.id));
@@ -446,20 +443,18 @@ class UserStore {
     return users;
   }
 
-  async getUser(userId: TSupportUser['id']) {
+  async getUser(userId: TUser['id']) {
     const users = await this.getUsers();
     return users.find((u) => u.id === userId);
   }
 
-  async getUserByUsernameAndType(
-    data: Pick<TSupportUser, 'username' | 'type'>
-  ) {
+  async getUserByUsernameAndType(data: Pick<TUser, 'username' | 'type'>) {
     const users = await this.getUsers();
     const user = users.find((u) => this.eq({ user1: u, user2: data }));
     return user;
   }
 
-  async getUserBySocketId(socketId: TSupportUser['socketId']) {
+  async getUserBySocketId(socketId: TUser['socketId']) {
     const users = await this.getUsers();
     const user = users.find((user) => user.socketId === socketId);
     return user;
@@ -469,23 +464,21 @@ class UserStore {
     user1,
     user2,
   }: {
-    user1: Pick<TSupportUser, 'username' | 'type'>;
-    user2: Pick<TSupportUser, 'username' | 'type'>;
+    user1: Pick<TUser, 'username' | 'type'>;
+    user2: Pick<TUser, 'username' | 'type'>;
   }) {
     return user1.type === user2.type && user1.username === user2.username;
   }
 
-  async getOrCreate(data: Omit<TSupportUser, 'id' | 'createdAt'>) {
+  async getOrCreate(data: Omit<TUser, 'id' | 'createdAt'>) {
     const user = await this.getUserByUsernameAndType(data);
     return user ? user : await this.createUser(data);
   }
 
   async createUser(
-    data: Omit<TSupportUser, 'id' | 'createdAt'>
-  ): Promise<TSupportUser | null> {
-    function objToRow(
-      obj: Omit<TSupportUser, 'createdAt'> & { createdAt: string }
-    ) {
+    data: Omit<TUser, 'id' | 'createdAt'>
+  ): Promise<TUser | null> {
+    function objToRow(obj: Omit<TUser, 'createdAt'> & { createdAt: string }) {
       const { id, username, type, socketId, createdAt } = obj;
       return [id, username, type, socketId, createdAt];
     }
@@ -521,7 +514,7 @@ class UserStore {
     }
   }
 
-  async removeUser(userId: TSupportUser['id']): Promise<boolean> {
+  async removeUser(userId: TUser['id']): Promise<boolean> {
     try {
       // Get all chats to find the row index
       const users = await this.getUsers();
@@ -574,9 +567,7 @@ class UserStore {
     }
   }
 
-  async removeUserBySocketId(
-    socketId: TSupportUser['socketId']
-  ): Promise<boolean> {
+  async removeUserBySocketId(socketId: TUser['socketId']): Promise<boolean> {
     try {
       // Get all chats to find the row index
       const user = await this.getUserBySocketId(socketId);
@@ -589,9 +580,9 @@ class UserStore {
   }
 
   async updateUser(
-    userId: TSupportUser['id'],
-    data: Partial<Omit<TSupportUser, 'id' | 'createdAt'>>
-  ): Promise<TSupportUser | null> {
+    userId: TUser['id'],
+    data: Partial<Omit<TUser, 'id' | 'createdAt'>>
+  ): Promise<TUser | null> {
     try {
       // First get the user to see if it exists and get current data
       const users = await this.getUsers();
@@ -651,7 +642,7 @@ class JoinService {
     messages,
     fields,
   }: {
-    messages: TSupportMessage[];
+    messages: TMessage[];
     fields: ('chat' | 'sender')[];
   }) {
     const populatedMessages = [];
@@ -667,7 +658,7 @@ class JoinService {
     }
     // if chat is fields - get chatIds and chats by that ids, attach chat
     for (const message of messages) {
-      const body = { ...message } as TSupportMessagePopulated;
+      const body = { ...message } as TMessagePopulated;
       if (fields.includes('chat')) {
         const chat = chats?.find((c) => c.id === message.chatId);
         if (chat) {
@@ -716,12 +707,12 @@ class JoinService {
       };
     });
   }
-  async getChatMessagesPopulated(chatId: TSupportChat['id']) {
+  async getChatMessagesPopulated(chatId: TChat['id']) {
     const messages = await this.messageStore.getMessages({ chatId });
     return await this.populateMessages({ messages, fields: ['sender'] });
   }
 
-  async sendMessage(body: Omit<TSupportMessage, 'id' | 'createdAt'>) {
+  async sendMessage(body: Omit<TMessage, 'id' | 'createdAt'>) {
     const message = await this.messageStore.createMessage(body);
     if (message) {
       const [populatedMessage] = await this.populateMessages({
@@ -841,7 +832,7 @@ app.prepare().then(async () => {
             });
           }
 
-          const chatMembers = [client] as TSupportUser[];
+          const chatMembers = [client] as TUser[];
           if (agentIsLoggedIn()) {
             if (agentUser) chatMembers.push(agentUser);
           }
@@ -887,7 +878,7 @@ app.prepare().then(async () => {
               type: 'client-only',
               text: `Hey there, ${username}! Nice to meet you again😃 No worries, agent will join soon and answer jour question!`,
             },
-          ] as Omit<TSupportMessage, 'id' | 'createdAt'>[];
+          ] as Omit<TMessage, 'id' | 'createdAt'>[];
 
           // create messages
           const messages = await Promise.all(
@@ -898,7 +889,7 @@ app.prepare().then(async () => {
 
           const lastMessageAgentVisible = messages.findLast(
             (m) => m?.type !== 'client-only'
-          ) as TSupportMessage;
+          ) as TMessage;
 
           const [populatedLastMessage] =
             await sheetJoinService.populateMessages({
@@ -910,7 +901,7 @@ app.prepare().then(async () => {
             id: chat.id,
             createdAt: chat.createdAt,
             lastMessage: populatedLastMessage,
-          } as TSupportChatShorting;
+          } as TChatShorting;
 
           if (agentUser) {
             const agent = await sheetUserStore.getUser(agentUser.id);
@@ -938,7 +929,7 @@ app.prepare().then(async () => {
 
     socket.on(
       'refresh-user',
-      async ({ userId }: { userId: TSupportUser['id'] }, callback) => {
+      async ({ userId }: { userId: TUser['id'] }, callback) => {
         try {
           console.log(`Refresing user: ${userId}`);
           const agent = await sheetUserStore.getUser(agentUser?.id || '');
@@ -1013,7 +1004,7 @@ app.prepare().then(async () => {
 
           const currentAgent = (await sheetUserStore.getUser(
             agentUser?.id || ''
-          )) as TSupportUser;
+          )) as TUser;
 
           if (currentAgent && isAgent) {
             const alreadyLoggedIn = currentAgent.socketId !== '0';
@@ -1070,7 +1061,7 @@ app.prepare().then(async () => {
     socket.on(
       'join-chat',
       async (
-        { chatId, user }: { chatId: TSupportChat['id']; user: TSupportUser },
+        { chatId, user }: { chatId: TChat['id']; user: TUser },
         callback
       ) => {
         const chat = await sheetChatStore.getChat(chatId);
@@ -1092,7 +1083,7 @@ app.prepare().then(async () => {
             text: `${user.username} joined room ${chatId}`,
             type: 'system',
             createdAt: new Date(),
-          } as TSupportMessagePopulated;
+          } as TMessagePopulated;
 
           socket.to(chatId).emit('user_joined', message);
           console.log(`${user.username} joined room ${chatId}`);
@@ -1110,7 +1101,7 @@ app.prepare().then(async () => {
             messages: isAgent
               ? chatMessages.filter((m) => m.type !== 'client-only')
               : chatMessages.filter((m) => m.type !== 'agent-only'),
-          } as TSupportChat;
+          } as TChat;
 
           callback?.(chatInfo);
         }
@@ -1121,10 +1112,10 @@ app.prepare().then(async () => {
       'message',
       async (
         body: {
-          chatId: TSupportChat['id'];
-          type: TSupportMessage['type'];
+          chatId: TChat['id'];
+          type: TMessage['type'];
           text: string;
-          senderId: TSupportMessage['senderId'];
+          senderId: TMessage['senderId'];
         },
         callback
       ) => {
@@ -1140,7 +1131,7 @@ app.prepare().then(async () => {
 
     socket.on(
       'logout',
-      async ({ userId }: { userId: TSupportUser['id'] }, callback) => {
+      async ({ userId }: { userId: TUser['id'] }, callback) => {
         try {
           const user = await sheetUserStore.getUser(userId);
 

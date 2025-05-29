@@ -1,8 +1,8 @@
-import { TSupportMessagePopulated } from '@/lib/type';
+import { TMessagePopulated } from '@/lib/type';
 import { useMemo } from 'react';
 
 interface ChatMessageProps {
-  message: TSupportMessagePopulated;
+  message: TMessagePopulated;
   isOwnMessage: boolean;
 }
 
