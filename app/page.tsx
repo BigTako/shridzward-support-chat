@@ -12,59 +12,6 @@ import ChatMessage from '@/components/ChatMessage';
 import ChatForm from '@/components/ChatForm';
 import toast from 'react-hot-toast';
 
-// function ClientLoginForm({ onSuccess }: { onSuccess: (user: TUser) => void }) {
-//   const handleLogin = async (username: string) => {
-//     const userData = {
-//       username,
-//       type: 'client',
-//     } as TUser;
-
-//     const result = (await socket.emitWithAck('login', userData)) as {
-//       status: 'success' | 'error';
-//       message: string;
-//     };
-
-//     if (result) {
-//       if (result.status === 'success') {
-//         onSuccess(userData);
-//         toast.success(result.message);
-//       } else {
-//         toast.error(result.message);
-//       }
-//     }
-//   };
-
-//   const [username, setUsername] = useState('');
-
-//   return (
-//     <div className='flex flex-col gap-4 w-[500px] text-center'>
-//       <h2 className='text-[24px] font-bold'>How should we call you?</h2>
-//       <form
-//         onSubmit={async (e) => {
-//           e.preventDefault();
-//           console.log('submit');
-//           await handleLogin(username);
-//         }}
-//         className='w-full flex flex-col gap-3'
-//       >
-//         <input
-//           type='text'
-//           placeholder='Enter username'
-//           className='flex-1 px-4 border-2 py-2 rounded-lg focus:outline-none'
-//           value={username}
-//           onChange={(e) => setUsername(e.target.value)}
-//         />
-//         <button
-//           type='submit'
-//           className='px-4 py-2 rounded-lg text-white bg-blue-500'
-//         >
-//           Submit
-//         </button>
-//       </form>
-//     </div>
-//   );
-// }
-
 export default function Home() {
   const searchParams = useSearchParams();
 
@@ -123,21 +70,9 @@ export default function Home() {
       setMessages((prev) => [...prev, message]);
     });
 
-    socket.on('user_left', (message) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          from: { username: '', type: 'client', socketId: socket?.id || '' },
-          type: 'system',
-          text: message,
-        },
-      ]);
-    });
-
     return () => {
       socket.off('message');
       socket.off('user_joined');
-      socket.off('user_left');
       if (user) socket.emitWithAck('logout', { user });
     };
   }, [user]);
