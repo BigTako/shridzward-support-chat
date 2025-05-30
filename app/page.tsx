@@ -21,12 +21,18 @@ export default function Home() {
 
   const [user, setUser] = useState<TUser | null>(null);
 
+  const [isRefresingUser, setIsRefreshingUser] = useState<boolean>(true);
+  const [isGettingClientData, setIsGettingClientData] = useState<boolean>(true);
+  const [isJoiningChat, setIsJoiningChat] = useState<boolean>(true);
+  const [isSendingMessage, setIsSendingMessage] = useState<boolean>(false);
+
   const isAuthenticated = user !== null;
 
   useEffect(() => {
     async function checkoutUser() {
       if (window) {
         const userId = localStorage.getItem('clientId');
+        setIsRefreshingUser(true);
         if (userId) {
           await socket
             .emitWithAck('refresh-user', { userId })
@@ -40,7 +46,11 @@ export default function Home() {
                 toast.error(result.message);
               }
             })
-            .catch(() => console.log('Failed to refresh agent'));
+            .catch(() => console.log('Failed to refresh agent'))
+            .finally(() => {
+              setIsRefreshingUser(false);
+              setIsGettingClientData(false);
+            });
         }
       }
     }
@@ -49,14 +59,16 @@ export default function Home() {
 
   useEffect(() => {
     if (isAuthenticated && chatId) {
+      setIsJoiningChat(true);
       socket
         .emitWithAck('join-chat', { chatId, user })
         .then((chat: TChatPopulated) => {
           setMessages((prev) => [
             ...prev.filter((m) => m.type === 'system'),
-            ...chat.messages,
+            ...(chat.messages || []),
           ]);
-        });
+        })
+        .finally(() => setIsJoiningChat(false));
     }
   }, [isAuthenticated, chatId, user]);
 
@@ -79,6 +91,7 @@ export default function Home() {
 
   const handleSendMessage = async (messageText: string) => {
     if (user && chatId) {
+      setIsSendingMessage(true);
       const messageBody = {
         type: 'user',
         text: messageText,
@@ -90,45 +103,55 @@ export default function Home() {
         'message',
         messageBody
       )) as TMessagePopulated;
-
+      setIsSendingMessage(false);
       setMessages((prev) => [...prev, message]);
     }
   };
 
   useEffect(() => {
     if (chatId) {
-      socket.emitWithAck('get-client-data', { chatId }).then((data: TUser) => {
-        setUser(data);
-      });
+      setIsGettingClientData(true);
+      socket
+        .emitWithAck('get-client-data', { chatId })
+        .then((data: TUser) => {
+          setUser(data);
+        })
+        .finally(() => {
+          setIsRefreshingUser(false);
+          setIsGettingClientData(false);
+        });
     }
   }, [chatId]);
 
   return (
     <div className='flex mt-24 justify-center w-full'>
-      {isAuthenticated ? (
-        chatId ? (
-          <div className='w-full max-w-3xl mx-auto'>
-            <h1 className='mb-4 text-2xl font-bold'>Room: 1</h1>
-            <div className='h-[500px] overflow-y-auto p-4 mb-4 bg-gray-200 border2 rounded-lg'>
-              {messages.map((msg, index) => (
-                <ChatMessage
-                  key={index}
-                  message={msg}
-                  isOwnMessage={Boolean(
-                    user && msg.sender && user?.id === msg.sender?.id
-                  )}
-                />
-              ))}
-            </div>
-            <ChatForm onSendMessage={handleSendMessage} />
+      {isRefresingUser || isGettingClientData || isJoiningChat ? (
+        <div className='flex h-full w-full justify-center items-center'>
+          <h3>Loading...</h3>
+        </div>
+      ) : chatId ? (
+        <div className='w-full max-w-3xl mx-auto'>
+          <h1 className='mb-4 text-2xl font-bold'>Room: 1</h1>
+          <div className='h-[500px] overflow-y-auto p-4 mb-4 bg-gray-200 border2 rounded-lg'>
+            {messages.map((msg, index) => (
+              <ChatMessage
+                key={index}
+                message={msg}
+                isOwnMessage={Boolean(
+                  user && msg.sender && user?.id === msg.sender?.id
+                )}
+              />
+            ))}
           </div>
-        ) : (
-          <div className='w-full max-w-3xl mx-auto flex justify-center items-center'>
-            <h3>{"You're not connected to any room"}</h3>
-          </div>
-        )
+          <ChatForm
+            isLoading={isSendingMessage}
+            onSendMessage={handleSendMessage}
+          />
+        </div>
       ) : (
-        <div>Loading...</div>
+        <div className='w-full max-w-3xl mx-auto flex justify-center items-center'>
+          <h3>{"You're not connected to any room"}</h3>
+        </div>
       )}
     </div>
   );

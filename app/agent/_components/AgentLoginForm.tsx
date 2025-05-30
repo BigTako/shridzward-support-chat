@@ -10,12 +10,16 @@ export function AgentLoginForm({
 }: {
   onSuccess: (user: TUser) => void;
 }) {
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const handleLogin = async (username: string, password: string) => {
-    const result = (await socket.emitWithAck('login', {
-      username,
-      type: 'agent',
-      password,
-    })) as AuthResponcePayload;
+    setIsLoggingIn(true);
+    const result = (await socket
+      .emitWithAck('login', {
+        username,
+        type: 'agent',
+        password,
+      })
+      .finally(() => setIsLoggingIn(false))) as AuthResponcePayload;
 
     if (result) {
       if (result.status === 'success' && result._meta) {
@@ -57,9 +61,10 @@ export function AgentLoginForm({
         />
         <button
           type='submit'
+          disabled={isLoggingIn}
           className='px-4 py-2 rounded-lg text-white bg-blue-500'
         >
-          Submit
+          {isLoggingIn ? 'Loading...' : 'Submit'}
         </button>
       </form>
     </div>

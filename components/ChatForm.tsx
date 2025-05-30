@@ -5,9 +5,11 @@ import { useState } from 'react';
 const ChatForm = ({
   onSendMessage,
   placeholder,
+  isLoading = false,
 }: {
   placeholder?: string;
   onSendMessage: (message: string) => void;
+  isLoading?: boolean;
 }) => {
   const [message, setMessage] = useState('');
   const handleSubmit = (e: React.FormEvent) => {
@@ -29,9 +31,10 @@ const ChatForm = ({
       />
       <button
         type='submit'
+        disabled={isLoading}
         className='px-4 py-2 rounded-lg text-white bg-blue-500'
       >
-        Send
+        {isLoading ? '.........' : 'Send'}
       </button>
     </form>
   );
