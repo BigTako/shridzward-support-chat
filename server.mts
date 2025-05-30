@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import {
   EnvVars,
   TChat,
+  TChatPopulated,
   TChatShorting,
   TMessage,
   TMessagePopulated,
@@ -12,7 +13,7 @@ import {
 } from './lib/type';
 import { google } from 'googleapis';
 import { randomUUID } from 'node:crypto';
-
+import { stringSimilarity } from 'string-similarity-js';
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = process.env.HOSTNAME || 'localhost';
 const port = parseInt(process.env.PORT || '3000', 10);
@@ -677,6 +678,44 @@ class JoinService {
     return populatedMessages;
   }
 
+  async populateChats({
+    chats,
+    fields,
+  }: {
+    chats: TChat[];
+    fields: ('members' | 'messages')[];
+  }) {
+    const populatedChats = [];
+    // let members;
+    let messages: TMessage[] = [];
+    if (fields.includes('messages')) {
+      const chatsIds = chats.map((chat) => chat.id);
+      messages = await this.messageStore.getMessages({
+        chatId: { in: chatsIds },
+      });
+    }
+
+    const popualatedMessages = await this.populateMessages({
+      messages,
+      fields: ['sender'],
+    });
+
+    for (const chat of chats) {
+      const body = { ...chat } as Omit<TChatPopulated, 'members'>;
+      if (fields.includes('messages')) {
+        const chatMessages = popualatedMessages?.filter(
+          (m) => m.chatId === chat.id
+        );
+        if (chat) {
+          body['messages'] = chatMessages;
+        }
+      }
+      populatedChats.push(body);
+    }
+
+    return populatedChats;
+  }
+
   async getChatShortings() {
     const chats = await this.chatStore.getChats();
     const chatIds = chats.map((c) => c.id);
@@ -1129,6 +1168,7 @@ app.prepare().then(async () => {
       }
     );
 
+    // search-withing-support-archieve
     socket.on(
       'logout',
       async ({ userId }: { userId: TUser['id'] }, callback) => {
@@ -1176,6 +1216,53 @@ app.prepare().then(async () => {
       }
     );
 
+    socket.on(
+      'get-answers-by-question',
+      async ({ question }: { question: string }, callback) => {
+        // get chats with such question
+        console.log('get-answers-by-question');
+        const chats = await sheetChatStore.getChats();
+        const relevantChatsIds = chats
+          .map((chat) => {
+            const relevancy = stringSimilarity(chat.userQuestion, question);
+            return {
+              id: chat.id,
+              relevancy,
+            };
+          })
+          .sort((a, b) => b.relevancy - a.relevancy)
+          .slice(0, 3)
+          .map((chat) => chat.id);
+
+        console.log({ relevantChatsIds });
+
+        const relevantChats = chats.filter((chat) =>
+          relevantChatsIds.includes(chat.id)
+        );
+
+        const populatedRelevantChats = await sheetJoinService.populateChats({
+          chats: relevantChats,
+          fields: ['messages'],
+        });
+
+        let textStr = 'Chat ID|User Question|Context|Created At|Messages\n';
+        populatedRelevantChats.map((chat) => {
+          const messagesText = chat.messages
+            ?.filter((m) => m.type === 'user')
+            .map((m) => `(${m.sender?.type},${m.text})`);
+          const infoStr = `${chat.id}|${chat.userQuestion}|${chat.context}|${chat.createdAt}|From(user type),Text\n${messagesText}`;
+          textStr += infoStr;
+        });
+
+        callback?.({
+          status: 'success',
+          message: 'Successfuly grabbed infromation related to user question',
+          _meta: {
+            text: textStr,
+          },
+        });
+      }
+    );
     socket.on('disconnect', async () => {
       console.log(`User is disconnected ${socket.id}`);
       const user = await sheetUserStore.getUserBySocketId(socket.id);

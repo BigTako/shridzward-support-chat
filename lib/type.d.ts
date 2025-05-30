@@ -23,8 +23,8 @@ type TChat = {
 };
 
 type TChatPopulated = Omit<TChat, 'members'> & {
-  members: TUser[];
-  messages: TMessagePopulated[];
+  members?: TUser[];
+  messages?: TMessagePopulated[];
 };
 
 export type TUser = {
