@@ -723,10 +723,12 @@ class JoinService {
       chatId: { in: chatIds },
     });
 
-    console.log({ messages: JSON.stringify(messages, undefined, 4) });
+    // console.log({ messages: JSON.stringify(messages, undefined, 4) });
 
     const lastMessages = chats.map((chat) => {
-      const chatMessages = messages.filter((m) => m.chatId === chat.id);
+      const chatMessages = messages.filter(
+        (m) => m.chatId === chat.id && m.type !== 'client-only'
+      );
       return chatMessages[chatMessages.length - 1];
     });
 
@@ -742,6 +744,7 @@ class JoinService {
       return {
         id: chat.id,
         createdAt: new Date(chat.createdAt),
+        userQuestion: chat.userQuestion,
         lastMessage,
       };
     });
@@ -915,7 +918,7 @@ app.prepare().then(async () => {
               senderId: claudeUser.id,
               chatId: chat.id,
               type: 'client-only',
-              text: `Hey there, ${username}! Nice to meet you again😃 No worries, agent will join soon and answer jour question!`,
+              text: `Hey there, ${username}! Nice to meet you again\nNo worries, agent will join soon and answer jour question😉`,
             },
           ] as Omit<TMessage, 'id' | 'createdAt'>[];
 
@@ -1119,7 +1122,9 @@ app.prepare().then(async () => {
               type: 'client',
               createdAt: new Date(),
             },
-            text: `${user.username} joined room ${chatId}`,
+            text: `${user.type === 'agent' ? 'Support Agent ' : ''}${
+              user.username
+            } joined the chat`,
             type: 'system',
             createdAt: new Date(),
           } as TMessagePopulated;
@@ -1263,6 +1268,7 @@ app.prepare().then(async () => {
         });
       }
     );
+
     socket.on('disconnect', async () => {
       console.log(`User is disconnected ${socket.id}`);
       const user = await sheetUserStore.getUserBySocketId(socket.id);

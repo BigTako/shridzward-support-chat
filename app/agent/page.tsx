@@ -167,8 +167,6 @@ export default function AgentPage() {
     }
   };
 
-  console.log({ isRefresingUser, user });
-
   return (
     <>
       <div className='flex mt-24 justify-center w-full'>

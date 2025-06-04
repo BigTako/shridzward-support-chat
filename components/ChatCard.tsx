@@ -23,7 +23,7 @@ export function ChatCard({ chat, onNameClick }: Props) {
         />
         <div className='flex-1 flex flex-col gap-1 max-w-full truncate text-start'>
           <h3 className='font-bold cursor-pointer' onClick={onNameClick}>
-            Room: {chat.id}
+            {chat.userQuestion}
           </h3>
           <h3 className='truncate text-ellipsis max-w-full'>
             <strong>{from}:</strong> {lastMessage}

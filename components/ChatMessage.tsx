@@ -44,7 +44,7 @@ const ChatMessage = ({ message, isOwnMessage }: ChatMessageProps) => {
         {!isSystemMessage && (
           <p className='text-sm font-bold'>{sender?.username}</p>
         )}
-        <p>{text}</p>
+        <p className='whitespace-pre-wrap'>{text}</p>
       </div>
     </div>
   );

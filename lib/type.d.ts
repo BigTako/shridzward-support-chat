@@ -49,7 +49,7 @@ export type TMessagePopulated = TMessage & {
   chat?: TChat;
 };
 
-export type TChatShorting = Pick<TChat, 'id' | 'createdAt'> & {
+export type TChatShorting = Pick<TChat, 'id' | 'createdAt' | 'userQuestion'> & {
   lastMessage: TMessagePopulated;
 };
 

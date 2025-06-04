@@ -131,7 +131,7 @@ export default function Home() {
         </div>
       ) : chatId ? (
         <div className='w-full max-w-3xl mx-auto'>
-          <h1 className='mb-4 text-2xl font-bold'>Room: 1</h1>
+          <h1 className='mb-4 text-2xl font-bold'>Chat with Support Agent</h1>
           <div className='h-[500px] overflow-y-auto p-4 mb-4 bg-gray-200 border2 rounded-lg'>
             {messages.map((msg, index) => (
               <ChatMessage
