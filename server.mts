@@ -941,6 +941,7 @@ app.prepare().then(async () => {
           const newChatShorting = {
             id: chat.id,
             createdAt: chat.createdAt,
+            userQuestion: question,
             lastMessage: populatedLastMessage,
           } as TChatShorting;
 
