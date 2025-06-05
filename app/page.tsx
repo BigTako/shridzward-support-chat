@@ -17,7 +17,7 @@ export default function Home() {
 
   const chatId = searchParams.get('chat');
 
-  const [messages, setMessages] = useState<TMessagePopulated[]>([]);
+  const [messages, setMessages] = useState<TMessagePopulated[] | null>([]);
 
   const [user, setUser] = useState<TUser | null>(null);
 
@@ -63,10 +63,14 @@ export default function Home() {
       socket
         .emitWithAck('join-chat', { chatId, user })
         .then((chat: TChatPopulated) => {
-          setMessages((prev) => [
-            ...prev.filter((m) => m.type === 'system'),
-            ...(chat.messages || []),
-          ]);
+          setMessages((prev) =>
+            prev
+              ? [
+                  ...prev.filter((m) => m.type === 'system'),
+                  ...(chat.messages || []),
+                ]
+              : chat.messages || []
+          );
         })
         .finally(() => setIsJoiningChat(false));
     }
@@ -75,11 +79,11 @@ export default function Home() {
   useEffect(() => {
     socket.on('message', (data) => {
       console.log(' received message from socket');
-      setMessages((prev) => [...prev, data]);
+      setMessages((prev) => (prev ? [...prev, data] : [data]));
     });
 
     socket.on('user_joined', (message: TMessagePopulated) => {
-      setMessages((prev) => [...prev, message]);
+      setMessages((prev) => (prev ? [...prev, message] : [message]));
     });
 
     return () => {
@@ -104,7 +108,7 @@ export default function Home() {
         messageBody
       )) as TMessagePopulated;
       setIsSendingMessage(false);
-      setMessages((prev) => [...prev, message]);
+      setMessages((prev) => (prev ? [...prev, message] : [message]));
     }
   };
 
@@ -123,16 +127,28 @@ export default function Home() {
     }
   }, [chatId]);
 
+  if (
+    isRefresingUser ||
+    isGettingClientData ||
+    isJoiningChat ||
+    !messages ||
+    !chatId
+  ) {
+    return (
+      <div className='h-screen w-screen flex justify-center items-center'>
+        <h3>{chatId ? 'Loading...' : "You're not connected to any room"}</h3>
+      </div>
+    );
+  }
+
   return (
-    <div className='flex mt-24 justify-center w-full'>
-      {isRefresingUser || isGettingClientData || isJoiningChat ? (
-        <div className='flex h-full w-full justify-center items-center'>
-          <h3>Loading...</h3>
-        </div>
-      ) : chatId ? (
-        <div className='w-full max-w-3xl mx-auto'>
-          <h1 className='mb-4 text-2xl font-bold'>Chat with Support Agent</h1>
-          <div className='h-[500px] overflow-y-auto p-4 mb-4 bg-gray-200 border2 rounded-lg'>
+    <div className='flex flex-col gap-3 justify-center items-center h-screen w-screen'>
+      <h3 className='text-[24px]'>
+        <strong>Chat with Support Agent</strong>
+      </h3>
+      <div className='h-[600px] w-[600px] shadow-[0px_0px_8px_0px_rgba(0,0,0,0.25)] rounded-[10px] p-2'>
+        <div className='w-full h-full flex flex-col gap-2'>
+          <div className='flex flex-col overflow-y-auto flex-1 h-[400px]'>
             {messages.map((msg, index) => (
               <ChatMessage
                 key={index}
@@ -148,11 +164,7 @@ export default function Home() {
             onSendMessage={handleSendMessage}
           />
         </div>
-      ) : (
-        <div className='w-full max-w-3xl mx-auto flex justify-center items-center'>
-          <h3>{"You're not connected to any room"}</h3>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

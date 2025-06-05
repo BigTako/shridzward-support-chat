@@ -13,13 +13,13 @@ export function ChatCard({ chat, onNameClick }: Props) {
   console.log({ chat });
   return (
     <div className='flex flex-col gap-3 justify-center p-4 shadow-[0px_0px_8px_0px_rgba(0,0,0,0.25)] rounded-[10px]'>
-      <div className='flex gap-2'>
+      <div className='flex gap-2 items-center'>
         <Image
-          className='h-[50px] w-[50px] rounded-full'
-          src='https://www.assuropoil.fr/wp-content/uploads/2023/07/avoir-un-chat-sante.jpg'
+          className='h-[40px] w-[40px] rounded-full'
+          src='https://cdn-icons-png.flaticon.com/512/1144/1144760.png'
           alt='Client image'
-          width={540}
-          height={840}
+          width={512}
+          height={512}
         />
         <div className='flex-1 flex flex-col gap-1 max-w-full truncate text-start'>
           <h3

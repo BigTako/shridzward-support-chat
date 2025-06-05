@@ -36,10 +36,10 @@ const ChatMessage = ({ message, isOwnMessage }: ChatMessageProps) => {
           : isOwnMessage
           ? 'justify-end'
           : 'justify-start'
-      } mb-3`}
+      } p-2`}
     >
       <div
-        className={`max-w-xs px-4 py-2 rounded-lg ${messageStyleMap[messageType]}`}
+        className={`shadow-[0px_0px_8px_0px_rgba(0,0,0,0.25)] max-w-xs px-4 py-2 rounded-lg ${messageStyleMap[messageType]}`}
       >
         {!isSystemMessage && (
           <p className='text-sm font-bold'>{sender?.username}</p>

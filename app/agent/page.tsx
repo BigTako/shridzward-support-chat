@@ -184,92 +184,88 @@ export default function AgentPage() {
   return (
     <div className='flex justify-center items-center h-screen w-screen'>
       <div className='flex flex-col gap-1'>
-        <div className='flex flex-col gap-2'>
-          {isAuthenticated && (
-            <div className='flex justify-end'>
-              <button
-                onClick={handleLogout}
-                className='px-4 py-2 h-fit bg-red-500 text-white font-bold rounded-lg'
-              >
-                <span>{isLoggingOut ? '.......' : 'Log Out'}</span>
-              </button>
+        {isAuthenticated && (
+          <div className='flex justify-end'>
+            <button
+              onClick={handleLogout}
+              className='px-4 py-2 h-fit bg-red-500 text-white font-bold rounded-lg'
+            >
+              <span>{isLoggingOut ? '.......' : 'Log Out'}</span>
+            </button>
+          </div>
+        )}
+        {isAuthenticated === null ? (
+          <div className='h-[500px] w-[500px] overflow-y-auto p-4 mt-4 shadow-[0px_0px_8px_0px_rgba(0,0,0,0.25)] rounded-[10px] flex justify-center items-center'>
+            <h3 className='h-fit'>Loading...</h3>
+          </div>
+        ) : isAuthenticated ? (
+          <div className='flex gap-3'>
+            <div className='flex flex-col gap-4 w-[500px] mt-10 text-center p-2'>
+              {isGettingChats ? (
+                <div className='flex h-full w-full justify-center items-center'>
+                  <h3>Loading</h3>
+                </div>
+              ) : chats && chats.length > 0 ? (
+                chats.map((chat, i) => (
+                  <ChatCard
+                    key={`client-chat-${i}`}
+                    onNameClick={() => setChatId(chat.id)}
+                    chat={chat}
+                  />
+                ))
+              ) : (
+                <div className='flex h-full w-full justify-center items-center'>
+                  <h3>No chats created yet</h3>
+                </div>
+              )}
             </div>
-          )}
-          {isAuthenticated === null ? (
-            <div className='h-[500px] w-[500px] overflow-y-auto p-4 mt-4 shadow-[0px_0px_8px_0px_rgba(0,0,0,0.25)] rounded-[10px] flex justify-center items-center'>
-              <h3 className='h-fit'>Loading...</h3>
-            </div>
-          ) : isAuthenticated ? (
-            <div className='flex gap-3'>
-              <div className='flex flex-col gap-4 w-[500px] mt-10 text-center p-2'>
-                {isGettingChats ? (
-                  <div className='flex h-full w-full justify-center items-center'>
-                    <h3>Loading</h3>
-                  </div>
-                ) : chats && chats.length > 0 ? (
-                  chats.map((chat, i) => (
-                    <ChatCard
-                      key={`client-chat-${i}`}
-                      onNameClick={() => setChatId(chat.id)}
-                      chat={chat}
-                    />
-                  ))
-                ) : (
-                  <div className='flex h-full w-full justify-center items-center'>
-                    <h3>No chats created yet</h3>
-                  </div>
-                )}
-              </div>
-              <div className='flex justify-center w-fit'>
-                <div className='w-fit mx-auto flex flex-col gap-1'>
-                  <h1 className='mb-4 text-2xl font-bold min-h-[32px]'>
-                    {Boolean(isJoiningChat) || !chatId || !messages
-                      ? null
-                      : `Chat: ${chatId}`}
-                  </h1>
-                  <div className='h-[600px] w-[500px] shadow-[0px_0px_8px_0px_rgba(0,0,0,0.25)] rounded-[10px] p-2'>
-                    {chatId && !isJoiningChat && messages ? (
-                      <div className='w-full h-full flex flex-col gap-2'>
-                        <div className='flex flex-col overflow-y-auto flex-1 h-[400px]'>
-                          {messages.map((msg, index) => (
-                            <ChatMessage
-                              key={index}
-                              message={msg}
-                              isOwnMessage={Boolean(
-                                user &&
-                                  msg.sender &&
-                                  user?.id === msg.sender?.id
-                              )}
-                            />
-                          ))}
-                        </div>
-                        <ChatForm
-                          isLoading={isSendingMessage}
-                          onSendMessage={handleSendMessage}
-                        />
+            <div className='flex justify-center w-fit'>
+              <div className='w-fit mx-auto flex flex-col gap-1'>
+                <h1 className='mb-4 text-2xl font-bold min-h-[32px]'>
+                  {Boolean(isJoiningChat) || !chatId || !messages
+                    ? null
+                    : `Chat: ${chatId}`}
+                </h1>
+                <div className='h-[600px] w-[500px] shadow-[0px_0px_8px_0px_rgba(0,0,0,0.25)] rounded-[10px] p-2'>
+                  {chatId && !isJoiningChat && messages ? (
+                    <div className='w-full h-full flex flex-col gap-2'>
+                      <div className='flex flex-col overflow-y-auto flex-1 h-[400px]'>
+                        {messages.map((msg, index) => (
+                          <ChatMessage
+                            key={index}
+                            message={msg}
+                            isOwnMessage={Boolean(
+                              user && msg.sender && user?.id === msg.sender?.id
+                            )}
+                          />
+                        ))}
                       </div>
-                    ) : (
-                      <div className='w-full h-full flex justify-center items-center'>
-                        {!chatId && 'Chat is not selected yet'}
-                        {isJoiningChat && 'Loading...'}
-                      </div>
-                    )}
-                  </div>
+                      <ChatForm
+                        isLoading={isSendingMessage}
+                        onSendMessage={handleSendMessage}
+                      />
+                    </div>
+                  ) : (
+                    <div className='w-full h-full flex justify-center items-center'>
+                      {!chatId && 'Chat is not selected yet'}
+                      {isJoiningChat && 'Loading...'}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          ) : (
-            <AgentLoginForm
-              onSuccess={(user) => {
-                setUser({ ...user, socketId: socket?.id || '' });
-                setIsAuthenticated(true);
-                if (window) {
-                  localStorage.setItem('userId', user.id);
-                }
-              }}
-            />
-          )}
-        </div>
+          </div>
+        ) : (
+          <AgentLoginForm
+            onSuccess={(user) => {
+              setUser({ ...user, socketId: socket?.id || '' });
+              setIsAuthenticated(true);
+              if (window) {
+                localStorage.setItem('userId', user.id);
+              }
+            }}
+          />
+        )}
       </div>
     </div>
   );
