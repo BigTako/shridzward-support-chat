@@ -78,7 +78,6 @@ export default function Home() {
 
   useEffect(() => {
     socket.on('message', (data) => {
-      console.log(' received message from socket');
       setMessages((prev) => (prev ? [...prev, data] : [data]));
     });
 

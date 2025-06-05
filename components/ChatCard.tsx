@@ -10,7 +10,7 @@ type Props = {
 export function ChatCard({ chat, onNameClick }: Props) {
   const from = chat.lastMessage?.sender?.username || 'Anonymous';
   const lastMessage = chat.lastMessage?.text || '...';
-  console.log({ chat });
+  // console.log({ chat });
   return (
     <div className='flex flex-col gap-3 justify-center p-4 shadow-[0px_0px_8px_0px_rgba(0,0,0,0.25)] rounded-[10px]'>
       <div className='flex gap-2 items-center'>

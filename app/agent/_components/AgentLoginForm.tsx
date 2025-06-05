@@ -40,7 +40,7 @@ export function AgentLoginForm({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          console.log('submit');
+          // console.log('submit');
           await handleLogin(username, password);
         }}
         className='w-full flex flex-col gap-3'

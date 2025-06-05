@@ -18,7 +18,7 @@ const ChatForm = ({
       onSendMessage(message);
       setMessage('');
     }
-    console.log('SUbmitted');
+    // console.log('SUbmitted');
   };
   return (
     <form onSubmit={handleSubmit} className='max-w-full flex gap-2'>

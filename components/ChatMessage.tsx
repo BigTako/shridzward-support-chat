@@ -27,7 +27,7 @@ const ChatMessage = ({ message, isOwnMessage }: ChatMessageProps) => {
     ? 'opponent'
     : (type as keyof typeof messageStyleMap);
 
-  console.log({ text: message.text, messageType });
+  // console.log({ text: message.text, messageType });
   return (
     <div
       className={`flex ${

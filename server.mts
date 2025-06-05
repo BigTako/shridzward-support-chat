@@ -858,6 +858,7 @@ app.prepare().then(async () => {
     socket.on(
       'create-new-chat',
       async ({ question, username, context }: TCreateChatPayload, callback) => {
+        console.log('creating new chat');
         try {
           if (!claudeUser) throw new Error('Claude user is not setup');
           // create new user with username
@@ -892,8 +893,6 @@ app.prepare().then(async () => {
               message: 'Failed to create chat',
             });
           }
-
-          console.log('creating new chat');
 
           let contextMessages = [];
 
@@ -1138,8 +1137,6 @@ app.prepare().then(async () => {
             chat.id
           );
 
-          console.log({ messages: JSON.stringify(chatMessages, undefined, 4) });
-
           const chatInfo = {
             ...chat,
             messages: isAgent
@@ -1177,6 +1174,7 @@ app.prepare().then(async () => {
     socket.on(
       'logout',
       async ({ userId }: { userId: TUser['id'] }, callback) => {
+        console.log(`Logout user`);
         try {
           const user = await sheetUserStore.getUser(userId);
 
@@ -1185,7 +1183,6 @@ app.prepare().then(async () => {
           const chats = await sheetChatStore.getChats({
             members: { includes: userId },
           });
-          console.log(`Logout user`);
 
           chats.forEach((room) => {
             socket.to(room.id).emit('user_left', `${user?.username} left`);
@@ -1238,8 +1235,6 @@ app.prepare().then(async () => {
           .sort((a, b) => b.relevancy - a.relevancy)
           .slice(0, 3)
           .map((chat) => chat.id);
-
-        console.log({ relevantChatsIds });
 
         const relevantChats = chats.filter((chat) =>
           relevantChatsIds.includes(chat.id)

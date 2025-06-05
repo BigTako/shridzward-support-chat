@@ -63,7 +63,7 @@ export default function AgentPage() {
     if (isAuthenticated) {
       setIsGettingChats(true);
       socket.emitWithAck('get-chats', {}).then((data: TChatShorting[]) => {
-        console.log({ data });
+        // console.log({ data });
         setChats(data);
         setIsGettingChats(false);
       });
