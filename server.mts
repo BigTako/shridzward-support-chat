@@ -783,6 +783,36 @@ export function getFormattedTimestamp() {
   return `${YYYY}-${MM}-${DD} ${hh}:${mm}:${ss}`;
 }
 
+// Helper function to wait until disconnection is complete
+async function waitForDisconnectComplete(maxWaitTimeMs = 5000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // Initial check
+    if (!isDisconnectingAgent) {
+      return resolve();
+    }
+
+    console.log('Waiting for agent disconnection to complete...');
+
+    // Set a timeout to avoid waiting indefinitely
+    const timeout = setTimeout(() => {
+      clearInterval(checkInterval);
+      reject(new Error('Timed out waiting for agent disconnect to complete'));
+    }, maxWaitTimeMs);
+
+    // Check the flag periodically
+    const checkInterval = setInterval(() => {
+      if (!isDisconnectingAgent) {
+        clearInterval(checkInterval);
+        clearTimeout(timeout);
+        console.log('Agent disconnection complete, continuing...');
+        resolve();
+      }
+    }, 100); // Check every 100ms
+  });
+}
+
+let isDisconnectingAgent = false;
+
 app.prepare().then(async () => {
   const httpServer = createServer(handle);
   const io = new Server(httpServer);
@@ -974,6 +1004,10 @@ app.prepare().then(async () => {
       async ({ userId }: { userId: TUser['id'] }, callback) => {
         try {
           console.log(`Refresing user: ${userId}`);
+          if (userId === agentUser?.id && isDisconnectingAgent) {
+            await waitForDisconnectComplete(10000);
+          }
+
           const agent = await sheetUserStore.getUser(agentUser?.id || '');
           if (agent && userId === agent.id && agent.socketId !== '0') {
             callback({
@@ -1041,6 +1075,10 @@ app.prepare().then(async () => {
         };
 
         try {
+          if (isDisconnectingAgent) {
+            await waitForDisconnectComplete(10000);
+          }
+
           console.log('login');
           const isAgent = type === 'agent';
 
@@ -1268,7 +1306,9 @@ app.prepare().then(async () => {
     socket.on('disconnect', async () => {
       console.log(`User is disconnected ${socket.id}`);
       const user = await sheetUserStore.getUserBySocketId(socket.id);
+
       if (user) {
+        isDisconnectingAgent = true;
         if (user.type === 'agent') {
           await sheetUserStore.updateUser(user.id, {
             socketId: '0',
@@ -1278,6 +1318,7 @@ app.prepare().then(async () => {
             socketId: '0',
           });
         }
+        isDisconnectingAgent = false;
       }
     });
   });
