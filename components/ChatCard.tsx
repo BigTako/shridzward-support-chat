@@ -12,7 +12,7 @@ export function ChatCard({ chat, onNameClick }: Props) {
   const lastMessage = chat.lastMessage?.text || '...';
   console.log({ chat });
   return (
-    <div className='flex flex-col gap-3 justify-center p-2 border-[1px] border-black rounded-lg'>
+    <div className='flex flex-col gap-3 justify-center p-4 shadow-[0px_0px_8px_0px_rgba(0,0,0,0.25)] rounded-[10px]'>
       <div className='flex gap-2'>
         <Image
           className='h-[50px] w-[50px] rounded-full'
@@ -22,12 +22,14 @@ export function ChatCard({ chat, onNameClick }: Props) {
           height={840}
         />
         <div className='flex-1 flex flex-col gap-1 max-w-full truncate text-start'>
-          <h3 className='font-bold cursor-pointer' onClick={onNameClick}>
+          <h3
+            className='font-bold cursor-pointer truncate text-ellipsis max-w-full'
+            onClick={onNameClick}
+          >
             {chat.userQuestion}
           </h3>
           <h3 className='truncate text-ellipsis max-w-full'>
             <strong>{from}:</strong> {lastMessage}
-            {/* {fromMapping[chat.from as FromType]}: {chat.lastMessage} */}
           </h3>
         </div>
       </div>
